@@ -38,7 +38,7 @@ from PyQt5.QtCore import *
 from PyQt5 import QtCore
 from PyQt5.QtWidgets import *
 import numpy as np
-from PlotWorkers import Plot1DWorker
+from PlotWorkers import Plot1DWorker, Plot2DWorker
 
 #from AveragedPlots import *
 
@@ -264,9 +264,12 @@ class AnalysisGUI(QMainWindow, AnalysisUI):
         keys_adjusted = np.array(xlabels) * sf
         plot1dworker = Plot1DWorker(current_folder, self.figure_1d, xlabel, units,
                                     fit_mean, fit_std, roi_labels, keys_adjusted, rois_to_exclude=self.rois_to_exclude)
+        plot2dworker = Plot2DWorker(current_folder, self.figure_2d, xlabel, units,
+                                    fit_mean, fit_std, roi_labels, keys_adjusted, rois_to_exclude=self.rois_to_exclude)
         self.threadpool.start(plot1dworker)
+        self.threadpool.start(plot2dworker)
 #        self.make_1d_plot()
-        self.make_2d_plot()
+#        self.make_2d_plot()
         if self.amplitude_feedback and 'reps' in folder_to_plot:
             self.adjust_amplitude_compensation()
         self.make_probe_plot()
