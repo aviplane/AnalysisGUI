@@ -22,8 +22,8 @@ class AnalysisUI:
         self.cb_data = QComboBox()
 
         self.checkbox_imaging_calibration = QCheckBox("Imaging Calibration")
-        self.checkbox_adjust_amplitudes = QCheckBox("Amplitude Adjustment Feedback")
-
+        self.checkbox_adjust_amplitudes = QCheckBox(
+            "Amplitude Adjustment Feedback")
 
         self.corr_min_label = QLabel("Sidemode Minimum Fraction: ")
         self.corr_max_label = QLabel("Sidemode Maximum Fraction: ")
@@ -62,15 +62,18 @@ class AnalysisUI:
         self.grid_layout.addWidget(self.cb_script, row_num, 1, 1, 1)
         self.grid_layout.addWidget(self.cb_data, row_num, 2, 1, 1)
         self.grid_layout.addWidget(
-                self.label_folder_name,
-                row_num, 3, 1, n_columns - 2
-                )
+            self.label_folder_name,
+            row_num, 3, 1, n_columns - 2
+        )
 
         row_num = row_num + 1
-        self.grid_layout.addWidget(self.checkbox_imaging_calibration, row_num, 0, 1, 1)
-        self.grid_layout.addWidget(self.checkbox_adjust_amplitudes, row_num, 1, 1, 1)
+        self.grid_layout.addWidget(
+            self.checkbox_imaging_calibration, row_num, 0, 1, 1)
+        self.grid_layout.addWidget(
+            self.checkbox_adjust_amplitudes, row_num, 1, 1, 1)
         self.probe_threshold_layout = QHBoxLayout()
-        self.grid_layout.addLayout(self.probe_threshold_layout, row_num, 2, 1, 5)
+        self.grid_layout.addLayout(
+            self.probe_threshold_layout, row_num, 2, 1, 5)
         self.probe_threshold_layout.addWidget(self.checkbox_probe_threhold)
         self.probe_threshold_layout.addWidget(self.probe_threshold_label)
         self.probe_threshold_layout.addWidget(self.probe_threshold)
@@ -78,7 +81,8 @@ class AnalysisUI:
         row_num = row_num + 1
         self.set_roi_selector(row_num)
         row_num = row_num + 1
-        self.grid_layout.addWidget(self.go_button, row_num, 0, 1, self.n_columns)
+        self.grid_layout.addWidget(
+            self.go_button, row_num, 0, 1, self.n_columns)
 
         self.figure_1d, self.axis_1d = plt.subplots()
         self.canvas_1d = FigureCanvas(self.figure_1d)
@@ -101,15 +105,20 @@ class AnalysisUI:
         self.toolbar_probe = NavigationToolbar(self.canvas_probe, self)
 
         row_num = row_num + 1
-        self.grid_layout.addWidget(self.toolbar_1d, row_num, 0, 1, self.n_columns/2)
-        self.grid_layout.addWidget(self.canvas_1d, row_num + 1, 0, 1, self.n_columns/2)
+        self.grid_layout.addWidget(
+            self.toolbar_1d, row_num, 0, 1, self.n_columns / 2)
+        self.grid_layout.addWidget(
+            self.canvas_1d, row_num + 1, 0, 1, self.n_columns / 2)
 
-        self.grid_layout.addWidget(self.toolbar_2d, row_num, self.n_columns/2, 1, self.n_columns/2)
-        self.grid_layout.addWidget(self.canvas_2d, row_num + 1, self.n_columns/2, 1, self.n_columns/2)
+        self.grid_layout.addWidget(
+            self.toolbar_2d, row_num, self.n_columns / 2, 1, self.n_columns / 2)
+        self.grid_layout.addWidget(
+            self.canvas_2d, row_num + 1, self.n_columns / 2, 1, self.n_columns / 2)
 
         row_num = row_num + 2
         self.corr_threshold_layout = QHBoxLayout()
-        self.grid_layout.addLayout(self.corr_threshold_layout, row_num, 0, 1, self.n_columns)
+        self.grid_layout.addLayout(
+            self.corr_threshold_layout, row_num, 0, 1, self.n_columns)
         self.corr_threshold_layout.addWidget(self.corr_min_label)
         self.corr_threshold_layout.addWidget(self.corr_min_value)
         self.corr_threshold_layout.addWidget(self.corr_threshold_min)
@@ -118,24 +127,31 @@ class AnalysisUI:
         self.corr_threshold_layout.addWidget(self.corr_threshold_max)
 
         row_num = row_num + 1
-        self.grid_layout.addWidget(self.toolbar_corr, row_num, 0, 1, self.n_columns/2)
-        self.grid_layout.addWidget(self.canvas_corr, row_num + 1, 0, 1, self.n_columns/2)
+        self.grid_layout.addWidget(
+            self.toolbar_corr, row_num, 0, 1, self.n_columns / 2)
+        self.grid_layout.addWidget(
+            self.canvas_corr, row_num + 1, 0, 1, self.n_columns / 2)
 
-        self.grid_layout.addWidget(self.toolbar_phase, row_num, self.n_columns/2, 1, self.n_columns/2)
-        self.grid_layout.addWidget(self.canvas_phase, row_num + 1, self.n_columns/2, 1, self.n_columns/2)
+        self.grid_layout.addWidget(
+            self.toolbar_phase, row_num, self.n_columns / 2, 1, self.n_columns / 2)
+        self.grid_layout.addWidget(
+            self.canvas_phase, row_num + 1, self.n_columns / 2, 1, self.n_columns / 2)
 
         row_num = row_num + 2
-        self.grid_layout.addWidget(self.toolbar_probe, row_num, 0, 1, self.n_columns/2)
-        self.grid_layout.addWidget(self.canvas_probe, row_num + 1, 0, 1, self.n_columns/2)
+        self.grid_layout.addWidget(
+            self.toolbar_probe, row_num, 0, 1, self.n_columns / 2)
+        self.grid_layout.addWidget(
+            self.canvas_probe, row_num + 1, 0, 1, self.n_columns / 2)
 
         self.canvas_1d.setFixedHeight(600)
         self.canvas_corr.setFixedHeight(600)
         self.canvas_probe.setFixedHeight(600)
+        self.canvas_2d.setFixedHeight(600)
 
         AnalysisGUI.setCentralWidget(self.scroll_area)
         QMetaObject.connectSlotsByName(AnalysisGUI)
 
-    def set_roi_selector(self, row_num = 2):
+    def set_roi_selector(self, row_num=2):
         self.n_columns = 12
         self.roi_selector_label = QLabel("ROIs to exclude:")
         rois = sorted(list(fancy_titles.keys()))
@@ -145,5 +161,6 @@ class AnalysisUI:
             self.grid_layout.addWidget(self.roi_checkboxes[i], 2, i + 1, 1, 1)
 
     def check_roi_boxes(self):
-        self.rois_to_exclude = [i.text() for i in self.roi_checkboxes if i.isChecked()]
+        self.rois_to_exclude = [i.text()
+                                for i in self.roi_checkboxes if i.isChecked()]
         return

@@ -38,7 +38,7 @@ from PyQt5.QtCore import *
 from PyQt5 import QtCore
 from PyQt5.QtWidgets import *
 import numpy as np
-from PlotWorkers import Plot1DWorker, Plot2DWorker
+from PlotWorkers import Plot1DWorker, Plot2DWorker, Plot1DHistogramWorker
 
 #from AveragedPlots import *
 
@@ -280,9 +280,12 @@ class AnalysisGUI(QMainWindow, AnalysisUI):
             self.canvas_corr.setFixedHeight(600)
             self.make_phase_plot()
             self.make_magnetization_plot()
-        else:
-            self.canvas_corr.setFixedHeight(20)
-
+        elif xlabel == no_xlabel_string:
+            self.canvas_corr.setFixedHeight(600)
+            plot1dhistworker = Plot1DHistogramWorker(
+                current_folder, self.figure_corr, xlabel, units,
+                fit_mean, fit_std, roi_labels, keys_adjusted, rois_to_exclude=self.rois_to_exclude)
+            self.threadpool.start(plot1dhistworker)
         self.set_data_cb()
         index = self.cb_data.findText(self.folder_to_plot)
         self.cb_data.setCurrentIndex(index)
@@ -626,6 +629,8 @@ class AnalysisGUI(QMainWindow, AnalysisUI):
             c_num = np.array([c_num])
         phase = np.angle(c_num)
         contrast = np.abs(c_num)
+        self.save_array(phase, "phase", current_folder)
+        self.save_array(contrast, "contrast", current_folder)
         nrows, ncolumns = 2, 2
 
         self.figure_phase.clf()

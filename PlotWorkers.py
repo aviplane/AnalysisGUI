@@ -82,3 +82,20 @@ class Plot1DWorker(PlotFitWorker):
             af.save_figure(self.fig, "1d_plot", self.current_folder)
         except:
             traceback.print_exc()
+
+
+class Plot1DHistogramWorker(PlotFitWorker):
+    def run(self):
+        try:
+            self.fig.clf()
+            axis = self.fig.add_subplot(111)
+            for state, state_std, label in zip(self.fit_mean, self.fit_std, self.roi_labels):
+                if label not in self.rois_to_exclude:
+                    axis.hist(np.mean(state, axis=1), bins='stone',
+                              label=fancy_titles[label])
+            axis.legend()
+            axis.set_ylabel("Number of Shots")
+            axis.set_xlabel(f"Imaging Counts")
+            af.save_figure(self.fig, "1d_histplot", self.current_folder)
+        except:
+            traceback.print_exc()
