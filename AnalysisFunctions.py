@@ -15,12 +15,13 @@ import traceback
 
 
 state_sf = np.array([1, 1, 1])
+data_location = "S:\\Schleier Lab Dropbox\\Cavity Lab Data\\"
+
 bg_fp = "S:\\Schleier Lab Dropbox\\Cavity Lab Data\\2019\\2019-12\\2019-12-18\\2019-12-11-TweezerSpectrumCard\\background_1807"
 rawim_bg = np.load(
-    "S:\\Schleier Lab Dropbox\\Cavity Lab Data\\Cavity Lab Scripts\\cavity_analysis\\background.npy")
+    f"{data_location}\\Cavity Lab Scripts\\cavity_analysis\\background.npy")
 background_components = np.load(
-    "S:\\Schleier Lab Dropbox\\Cavity Lab Data\\Cavity Lab Scripts\\cavity_analysis\\background_components_pca.npy")
-data_location = "S:\\Schleier Lab Dropbox\\Cavity Lab Data\\"
+    f"{data_location}\\Cavity Lab Scripts\\cavity_analysis\\background_components_pca.npy")
 
 
 def get_complete_folder_path(apd, datafolder, data_date=str(date.today())):

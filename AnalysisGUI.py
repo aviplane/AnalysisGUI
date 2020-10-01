@@ -52,6 +52,7 @@ class AnalysisGUI(QMainWindow, AnalysisUI):
         self.cb_script.currentIndexChanged.connect(self.set_script_folder)
         self.cb_data.activated.connect(self.set_data_folder)
         self.picker_date.dateChanged.connect(self.set_date)
+        self.parameters_lineedit.returnPressed.connect(self.set_parameters)
         self.go_button.clicked.connect(
             self.make_sorter_thread)  # self.sort_all_files)
         self.checkbox_imaging_calibration.stateChanged.connect(
@@ -71,6 +72,7 @@ class AnalysisGUI(QMainWindow, AnalysisUI):
         self.amplitude_feedback = False
         self.rm_client = Client(host='171.64.58.213')
         self.threadpool = QThreadPool()
+        self.parameters = ""
 
     def set_date(self, date):
         self.date = date.toString(date_format_string)
@@ -82,6 +84,16 @@ class AnalysisGUI(QMainWindow, AnalysisUI):
             self.worker.imaging_calibration = self.imaging_calibration
         except Exception as e:
             print(e, "trying to turn on imaging calibration")
+
+    def set_parameters(self):
+        parameter_text = self.parameters_lineedit.text()
+        parameter_list = [i.strip() for i in parameter_text.split(",")]
+        self.parameters = parameter_list
+        try:
+            self.worker.parameters = self.parameters
+        except AttributeError as e:
+            traceback.print_exc()
+            print(e, "No file sorter worker yet...")
 
     def set_amplitude_feedback(self):
         self.amplitude_feedback = self.checkbox_adjust_amplitudes.isChecked()
@@ -170,6 +182,7 @@ class AnalysisGUI(QMainWindow, AnalysisUI):
             # Any other args, kwargs are passed to the run function
             self.worker = FileSorter(
                 self.script_folder, self.date, self.imaging_calibration)
+            self.worker.parameters = self.parameters
             self.worker.signal_output.folder_output_signal.connect(
                 self.make_plots)
             self.worker.start()
@@ -273,7 +286,7 @@ class AnalysisGUI(QMainWindow, AnalysisUI):
         if self.amplitude_feedback and 'reps' in folder_to_plot:
             self.adjust_amplitude_compensation()
         self.make_probe_plot()
-        if "pc" in self.folder_to_plot and 'time' not in self.folder_to_plot:
+        if "PairCreation" in self.folder_to_plot and 'time' not in self.folder_to_plot:
             self.canvas_corr.setFixedHeight(600)
             self.make_correlation_plot()
         elif "IntDuration" in self.folder_to_plot or "OG_Duration" in self.folder_to_plot:
@@ -311,7 +324,9 @@ class AnalysisGUI(QMainWindow, AnalysisUI):
         fit_1m1 = fits[:, roi_labels.index('roi1-1')]
         fit_1p1 = fits[:, roi_labels.index('roi11')]
         fit_sum = fit_10 + fit_1m1 + fit_1p1
-        if len(fit_sum) == 6:
+        trap_values = np.mean(fit_sum, axis=0)
+        compensation = trap_values[::-1] ** (-1 / 2)
+        if len(fit_sum) > 5 and len(fit_sum) % 6 == 0:
             trap_values = np.mean(fit_sum, axis=0)
             compensation = trap_values[::-1] ** (-1 / 2)
             new_compensation = current_compensation * compensation
@@ -319,7 +334,7 @@ class AnalysisGUI(QMainWindow, AnalysisUI):
                 np.linalg.norm(new_compensation)
             np.save(compensation_path, new_compensation)
             print("Engaging new scan")
-            self.rm_client.engage()
+#            self.rm_client.engage()
         return
 
     def make_probe_plot(self):
@@ -595,10 +610,8 @@ class AnalysisGUI(QMainWindow, AnalysisUI):
         with open(current_folder + "/xlabel.txt", 'r') as xlabel_file:
             xlabel = xlabel_file.read().strip()
         sf, units = unitsDef(xlabel)
-        print("a")
         if xlabel != "PR_IntDuration" and xlabel != "OG_Duration":
             return
-        print("b")
         globals_list = np.load(current_folder + "/globals.npy",
                                allow_pickle=True)
         fits = np.load(current_folder + "/all_fits.npy")
@@ -621,7 +634,6 @@ class AnalysisGUI(QMainWindow, AnalysisUI):
         n_traps = fits_x.shape[2]
         if len(keys_adjusted) < 2:
             return
-        print('d')
         extent = [-0.5, n_traps + 0.5, np.max(keys_adjusted) + np.diff(keys_adjusted)[0],
                   np.min(keys_adjusted)]
         c_num = x_pol + 1j * y_pol

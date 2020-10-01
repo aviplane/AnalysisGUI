@@ -49,7 +49,7 @@ class AnalysisUI:
         self.label_folder_name = QLabel(f"{analysis_folder_string}: ")
 
         self.parameters_label = QLabel(f"Parameters: ")
-        self.parameters = QLineEdit()
+        self.parameters_lineedit = QLineEdit()
 
         self.rois_selection = []
 
@@ -80,6 +80,10 @@ class AnalysisUI:
         self.probe_threshold_layout.addWidget(self.probe_threshold_value_label)
         row_num = row_num + 1
         self.set_roi_selector(row_num)
+        row_num += 1
+        # Add in parameter field
+        self.grid_layout.addWidget(self.parameters_label, row_num, 0, 1, 1)
+        self.grid_layout.addWidget(self.parameters_lineedit, row_num, 1, 1, 2)
         row_num = row_num + 1
         self.grid_layout.addWidget(
             self.go_button, row_num, 0, 1, self.n_columns)
