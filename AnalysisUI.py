@@ -152,9 +152,9 @@ class AnalysisUI:
             self.canvas_probe, row_num + 1, 0, 1, self.n_columns / 2)
 
         self.grid_layout.addWidget(
-            self.toolbar_6, row_num, 0, 1, self.n_columns / 2)
+            self.toolbar_6, row_num, self.n_columns / 2, 1, self.n_columns / 2)
         self.grid_layout.addWidget(
-            self.canvas_6, row_num + 1, 0, 1, self.n_columns / 2)
+            self.canvas_6, row_num + 1, self.n_columns / 2, 1, self.n_columns / 2)
 
         self.canvas_1d.setFixedHeight(600)
         self.canvas_corr.setFixedHeight(600)

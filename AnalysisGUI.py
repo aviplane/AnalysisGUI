@@ -38,7 +38,7 @@ from PyQt5.QtCore import *
 from PyQt5 import QtCore
 from PyQt5.QtWidgets import *
 import numpy as np
-from PlotWorkers import Plot1DWorker, Plot2DWorker, Plot1DHistogramWorker
+from PlotWorkers import Plot1DWorker, Plot2DWorker, Plot1DHistogramWorker, PlotPCAWorker
 
 #from AveragedPlots import *
 
@@ -289,6 +289,9 @@ class AnalysisGUI(QMainWindow, AnalysisUI):
         if "PairCreation" in self.folder_to_plot and 'time' not in self.folder_to_plot:
             self.canvas_corr.setFixedHeight(600)
             self.make_correlation_plot()
+            plotPCAworker = PlotPCAWorker(
+                current_folder, self.figure_6, xlabel, units, fit_mean, fit_std, roi_labels, keys_adjusted, rois_to_exclude=self.rois_to_exclude)
+            self.threadpool.start(plotPCAworker)
         elif "IntDuration" in self.folder_to_plot or "OG_Duration" in self.folder_to_plot:
             self.canvas_corr.setFixedHeight(600)
             self.make_phase_plot()

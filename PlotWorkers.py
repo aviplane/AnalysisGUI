@@ -8,6 +8,7 @@ import AnalysisFunctions as af
 import traceback
 import math
 from colorcet import cm
+from sklearn.decomposition import PCA
 
 
 class PlotFitWorker(QRunnable):
@@ -99,3 +100,40 @@ class Plot1DHistogramWorker(PlotFitWorker):
             af.save_figure(self.fig, "1d_histplot", self.current_folder)
         except:
             traceback.print_exc()
+
+
+class PlotPCAWorker(PlotFitWorker):
+    def run(self):
+        if self.fit_mean.shape[1] < 8:
+            return
+        n_traps = self.fit_mean.shape[2]
+        self.roi_labels = list(self.roi_labels)
+        fit_1m1 = self.fit_mean[self.roi_labels.index('roi1-1')]  # fit_sum
+        fit_1p1 = self.fit_mean[self.roi_labels.index('roi11')]  # fit_sum
+        fit_10 = self.fit_mean[self.roi_labels.index('roi10')]
+        fit_sum = (fit_1m1 + fit_1p1 + fit_10)
+        fit_1m1, fit_1p1 = fit_1m1 / fit_sum, fit_1p1 / fit_sum
+
+        fit_side_mode = np.hstack([fit_1m1, fit_1p1])
+        n_components = 5
+        side_mode_pca = PCA(n_components=n_components)
+        side_mode_pca.fit(fit_side_mode)
+
+        variance_explanation = side_mode_pca.explained_variance_ratio_
+        components = side_mode_pca.components_
+
+        self.fig.clf()
+        ax_num = 1
+        for component, variance in zip(components, variance_explanation):
+            ax = self.fig.add_subplot(n_components, 1, ax_num)
+            c = [component[:n_traps], component[n_traps:]]
+            mag = np.max(np.abs(c))
+            cax = ax.imshow(c, cmap=cm.coolwarm, vmin=-mag, vmax=mag)
+            ax.set_yticks([0, 1])
+            ax.set_yticklabels(["1, -1", "1, 1"])
+            ax.set_title(f"Variance explained: {variance * 100:.1f}%")
+            self.fig.colorbar(cax, ax=ax)
+            ax.set_xlabel("Trap Index")
+            ax_num += 1
+
+        af.save_figure(self.fig, "pc_pca_copmonents", self.current_folder)
