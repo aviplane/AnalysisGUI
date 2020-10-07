@@ -89,7 +89,6 @@ class FileSorter(QThread):
                     json.dump(self.xlabel_dict, dict_file)
             if self.xlabel_dict[scan] in self.parameters:
                 self.xlabel_dict[scan] = no_xlabel_string
-
             extra_params = self.parameter_strings(file, self.parameters)
             self.folder_to_plot = f"{self.data_folder_dict[scan]}_{extra_params}_{scan[-6:]}"
             current_folder = f"{self.holding_folder}/{self.folder_to_plot}/"
@@ -104,9 +103,11 @@ class FileSorter(QThread):
         return self.folder_to_plot
 
     def parameter_strings(self, file, parameters):
+        if parameters == [] or parameters == '':
+            return ''
         file_globals = af.extract_globals(file)
         factors, units = zip(*[unitsDef(param) for param in parameters])
-        parameter_strings = [f"{parameter.split('_')[-1]}{file_globals[parameter] * factor:.2f}{unit}"
+        parameter_strings = [f"{parameter.split('_')[-1]}{file_globals[parameter] * factor}{unit}"
                              for parameter, unit, factor in zip(parameters, units, factors)
                              if parameter in file_globals]
 
@@ -125,6 +126,7 @@ class FileSorter(QThread):
             print("Adjusting ROIs")
             fits = self.adjust_rois(fits, roi_labels)
         physics_probe, bare_probe = self.get_cavity_transmission(file)
+        print(file)
         try:
             all_fits = np.load(current_folder + "/all_fits.npy")
             xlabels = np.load(current_folder + "/xlabels.npy")

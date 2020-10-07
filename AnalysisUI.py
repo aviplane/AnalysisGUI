@@ -108,6 +108,10 @@ class AnalysisUI:
         self.canvas_probe = FigureCanvas(self.figure_probe)
         self.toolbar_probe = NavigationToolbar(self.canvas_probe, self)
 
+        self.figure_6, _ = plt.subplots()
+        self.canvas_6 = FigureCanvas(self.figure_6)
+        self.toolbar_6 = NavigationToolbar(self.canvas_6, self)
+
         row_num = row_num + 1
         self.grid_layout.addWidget(
             self.toolbar_1d, row_num, 0, 1, self.n_columns / 2)
@@ -146,6 +150,11 @@ class AnalysisUI:
             self.toolbar_probe, row_num, 0, 1, self.n_columns / 2)
         self.grid_layout.addWidget(
             self.canvas_probe, row_num + 1, 0, 1, self.n_columns / 2)
+
+        self.grid_layout.addWidget(
+            self.toolbar_6, row_num, 0, 1, self.n_columns / 2)
+        self.grid_layout.addWidget(
+            self.canvas_6, row_num + 1, 0, 1, self.n_columns / 2)
 
         self.canvas_1d.setFixedHeight(600)
         self.canvas_corr.setFixedHeight(600)
