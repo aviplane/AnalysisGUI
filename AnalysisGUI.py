@@ -292,7 +292,7 @@ class AnalysisGUI(QMainWindow, AnalysisUI):
             plotPCAworker = PlotPCAWorker(
                 current_folder, self.figure_6, xlabel, units, fit_mean, fit_std, roi_labels, keys_adjusted, rois_to_exclude=self.rois_to_exclude)
             self.threadpool.start(plotPCAworker)
-        elif "IntDuration" in self.folder_to_plot or "OG_Duration" in self.folder_to_plot:
+        elif "IntDuration" in self.folder_to_plot or "OG_Duration" in self.folder_to_plot or "SpinExchange" in self.folder_to_plot:
             self.canvas_corr.setFixedHeight(600)
             self.make_phase_plot()
             self.make_magnetization_plot()

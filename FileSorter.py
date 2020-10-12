@@ -23,7 +23,7 @@ class FileSorter(QThread):
     def __init__(self, script_folder, date, imaging_calibration):
         super(FileSorter, self).__init__()
 
-        self.shot_threshold_size = 10e6
+        self.shot_threshold_size = 12e6
         self.script_folder = script_folder
         self.date = date
         self.holding_folder = af.get_holding_folder(
@@ -52,7 +52,7 @@ class FileSorter(QThread):
                     self.folder_to_plot)
             else:
                 print("No Folders made yet")
-            QThread.sleep(1)
+            QThread.sleep(3)
         print("Thread ended")
 
     def stop(self):
@@ -107,11 +107,19 @@ class FileSorter(QThread):
             return ''
         file_globals = af.extract_globals(file)
         factors, units = zip(*[unitsDef(param) for param in parameters])
-        parameter_strings = [f"{parameter.split('_')[-1]}{file_globals[parameter] * factor}{unit}"
+        parameter_strings = [f"{parameter.split('_')[-1]}{self.format_parameter(file_globals[parameter] * factor)}{unit}"
                              for parameter, unit, factor in zip(parameters, units, factors)
                              if parameter in file_globals]
 
         return '_'.join(parameter_strings)
+
+    def format_parameter(self, value):
+        if hasattr(value, '__iter__'):
+            return '-'.join(map(str, value))
+        else:
+            # not iterable
+            return f"{value:.3f}"
+        return
 
     def process_file(self, file, current_folder):
         """
@@ -236,7 +244,9 @@ class FileSorter(QThread):
             xlabel = xlabels[0]
 
         if scan_globals["MeasurePairCreation"]:
-            main_string = 'PairCreation'
+            main_string = 'PairCreation_' + main_string
+        if scan_globals["MeasureSpinExchange"]:
+            main_string = "SpinExchange_" + main_string
         if scan_globals["CheckCavityShift"]:
             main_string = "cavity_shift"
             xlabel = "PR_DLProbe_Agilent_FlipFlopFreq"
