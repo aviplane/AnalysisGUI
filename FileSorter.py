@@ -118,7 +118,7 @@ class FileSorter(QThread):
             return '-'.join(map(str, value))
         else:
             # not iterable
-            return f"{value:.3f}"
+            return f"{np.round(value, 4)}"
         return
 
     def process_file(self, file, current_folder):

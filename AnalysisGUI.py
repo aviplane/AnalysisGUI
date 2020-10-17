@@ -38,9 +38,9 @@ from PyQt5.QtCore import *
 from PyQt5 import QtCore
 from PyQt5.QtWidgets import *
 import numpy as np
-from PlotWorkers import Plot1DWorker, Plot2DWorker, Plot1DHistogramWorker, PlotPCAWorker
+from PlotWorkers import Plot1DWorker, Plot2DWorker, Plot1DHistogramWorker, PlotPCAWorker, PlotCorrelationWorker
 
-#from AveragedPlots import *
+# from AveragedPlots import *
 
 
 class AnalysisGUI(QMainWindow, AnalysisUI):
@@ -141,12 +141,6 @@ class AnalysisGUI(QMainWindow, AnalysisUI):
 
         max_value = self.corr_threshold_max.value() / 100
         self.corr_max_value.setText(f"{max_value:.2f}")
-
-        try:
-            # if "pc" in self.folder_to_plot and "time" not in self.folder_to_plot:
-            self.make_correlation_plot()
-        except AttributeError:
-            print("Have not selected a folder yet.")
 
     def set_probe_threshold(self):
         try:
@@ -288,10 +282,18 @@ class AnalysisGUI(QMainWindow, AnalysisUI):
         self.make_probe_plot()
         if "PairCreation" in self.folder_to_plot and 'time' not in self.folder_to_plot:
             self.canvas_corr.setFixedHeight(600)
-            self.make_correlation_plot()
+            # self.make_correlation_plot()
+            threshold_low = self.corr_threshold_min.value() / 100
+            threshold_high = self.corr_threshold_max.value() / 100
             plotPCAworker = PlotPCAWorker(
-                current_folder, self.figure_6, xlabel, units, fit_mean, fit_std, roi_labels, keys_adjusted, rois_to_exclude=self.rois_to_exclude)
+                current_folder, self.figure_phase, xlabel, units, fits, fit_std, roi_labels, keys_adjusted, rois_to_exclude=self.rois_to_exclude
+            )
+            plotCorrelationWorker = PlotCorrelationWorker(
+                current_folder, self.figure_corr, xlabel, units, fits, fit_std, roi_labels, keys_adjusted, rois_to_exclude=self.rois_to_exclude
+            )
+            plotCorrelationWorker.set_limits(threshold_low, threshold_high)
             self.threadpool.start(plotPCAworker)
+            self.threadpool.start(plotCorrelationWorker)
         elif "IntDuration" in self.folder_to_plot or "OG_Duration" in self.folder_to_plot or "SpinExchange" in self.folder_to_plot:
             self.canvas_corr.setFixedHeight(600)
             self.make_phase_plot()
@@ -440,86 +442,6 @@ class AnalysisGUI(QMainWindow, AnalysisUI):
         ax.set_xlabel(f"Trap Index")
         self.save_figure(self.figure_corr, "magnetization", current_folder)
         self.canvas_corr.draw()
-
-    def make_2d_plot(self):
-        current_folder = f"{self.holding_folder}/{self.folder_to_plot}/"
-        with open(current_folder + "/xlabel.txt", 'r') as xlabel_file:
-            xlabel = xlabel_file.read().strip()
-        sf, units = unitsDef(xlabel)
-        fits = np.load(current_folder + "/all_fits.npy")
-        if len(fits) < 2:
-            return
-        xlabels = np.load(current_folder + "/xlabels.npy")
-        physics_probes = np.load(
-            current_folder + "/fzx_probe.npy", allow_pickle=True)
-        fits, xlabels = self.select_probe_threshold(
-            fits, xlabels, physics_probes)
-        if len(xlabels) < 2:
-            return
-        roi_labels = np.load(current_folder + "/roi_labels.npy")
-        fit_mean, fit_std, xlabels = self.group_shot(fits, xlabels)
-        fit_mean, fit_std = np.swapaxes(
-            fit_mean, 0, 1), np.swapaxes(fit_std, 0, 1)
-
-        self.figure_2d.clf()
-        rois_to_plot = [i for i in range(
-            len(roi_labels)) if roi_labels[i] not in self.rois_to_exclude]
-        n_rows, n_columns = 2, math.ceil(len(rois_to_plot) / 2)
-        keys_adjusted = np.array(xlabels) * sf
-        if len(keys_adjusted) < 2:
-            return
-        extent = [-0.5, fit_mean.shape[2] + 0.5,
-                  np.max(keys_adjusted) + np.diff(keys_adjusted)[0],
-                  np.min(keys_adjusted)]
-        for e, i in enumerate(rois_to_plot):
-            label = roi_labels[i]
-            ax = self.figure_2d.add_subplot(n_rows, n_columns, e + 1)
-            cax = ax.imshow(fit_mean[i], aspect="auto",
-                            cmap=cm.blues, extent=extent, vmin=0)
-            self.save_array(fit_mean[i], label, current_folder)
-            self.figure_2d.colorbar(cax, ax=ax, label="Fitted counts")
-            if label in fancy_titles.keys():
-                ax.set_title(fancy_titles[label])
-            else:
-                ax.set_title(label)
-            ax.set_xlabel("Trap Index")
-            ax.set_ylabel(f"{xlabel} ({units})")
-        self.save_figure(self.figure_2d, "2d_plot", current_folder)
-        self.canvas_2d.draw()
-
-    def make_1d_plot(self):
-        current_folder = f"{self.holding_folder}/{self.folder_to_plot}/"
-        print("1D Plot: ", current_folder)
-        with open(current_folder + "/xlabel.txt", 'r') as xlabel_file:
-            xlabel = xlabel_file.read().strip()
-        sf, units = unitsDef(xlabel)
-        fits = np.load(current_folder + "/all_fits.npy")
-        xlabels = np.load(current_folder + "/xlabels.npy")
-        physics_probes = np.load(
-            current_folder + "/fzx_probe.npy", allow_pickle=True)
-        fits, xlabels = self.select_probe_threshold(
-            fits, xlabels, physics_probes)
-        roi_labels = np.load(current_folder + "/roi_labels.npy")
-        fit_mean, fit_std, xlabels = self.group_shot(fits, xlabels)
-        fit_mean, fit_std = np.swapaxes(
-            fit_mean, 0, 1), np.swapaxes(fit_std, 0, 1)
-        keys_adjusted = np.array(xlabels) * sf
-
-        self.axis_1d.clear()
-        for state, state_std, label in zip(fit_mean, fit_std, roi_labels):
-            if label not in self.rois_to_exclude:
-                transparent_edge_plot(self.axis_1d,
-                                      keys_adjusted,
-                                      np.mean(state, axis=1),
-                                      np.mean(state_std, axis=1),
-                                      label=fancy_titles[label])
-                self.save_array(np.mean(state, axis=1),
-                                f"{label}_1d", current_folder)
-        self.axis_1d.legend()
-        self.axis_1d.set_ylabel("Average trap counts")
-        self.axis_1d.set_xlabel(f"{xlabel} ({units})")
-        self.save_figure(self.figure_1d, "1d_plot", current_folder)
-        self.canvas_1d.draw()
 
     def make_correlation_plot(self):
         n_traps = 18
@@ -702,7 +624,7 @@ class AnalysisGUI(QMainWindow, AnalysisUI):
         labels = sorted(fit_dict.keys())
         means = np.array([np.mean(fit_dict[label], axis=0)
                           for label in labels])
-        #stds = np.array([np.std(fit_dict[label], axis = 0) for label in labels])
+        # stds = np.array([np.std(fit_dict[label], axis = 0) for label in labels])
         return means, labels
 
     def group_shot_globals(self, fits, globals_list, parameter):

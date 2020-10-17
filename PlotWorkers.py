@@ -137,3 +137,85 @@ class PlotPCAWorker(PlotFitWorker):
             ax_num += 1
 
         af.save_figure(self.fig, "pc_pca_copmonents", self.current_folder)
+
+
+class PlotCorrelationWorker(PlotFitWorker):
+    def set_limits(self, correlation_low, correlation_high):
+        self.threshold_low = correlation_low
+        self.threshold_high = correlation_high
+
+    def run(self):
+        if self.fit_mean.shape[0] < 2:
+            return
+        self.roi_labels = list(self.roi_labels)
+        fit_10 = self.fit_mean[:, self.roi_labels.index('roi10')]
+        fit_1m1 = self.fit_mean[:, self.roi_labels.index('roi1-1')]
+        fit_1p1 = self.fit_mean[:, self.roi_labels.index('roi11')]
+        n_traps = fit_10.shape[1]
+        sidemode = np.mean(
+            (fit_1m1 + fit_1p1) / (fit_10 + fit_1m1 + fit_1p1),
+            axis=1
+        )
+
+        print(sidemode, sidemode.shape)
+        threshold_index = np.where((sidemode >= self.threshold_low) &
+                                   (sidemode < self.threshold_high))
+
+        if self.threshold_low > self.threshold_high:
+            return
+        fit_1m1 = fit_1m1[threshold_index]
+        fit_1p1 = fit_1p1[threshold_index]
+        fit_10 = fit_10[threshold_index]
+        fit_sum = fit_10 + fit_1m1 + fit_1p1
+        fit_sidemode = fit_1m1 + fit_1p1
+        corr = np.corrcoef(
+            (fit_1m1 / fit_sum).T,
+            (fit_1p1 / fit_sum).T)[:n_traps, n_traps:]
+        corr_sidemode = np.corrcoef(
+            (fit_1m1 / fit_sidemode).T,
+            (fit_1p1 / fit_sidemode).T)[:n_traps, n_traps:]
+        self.fig.clf()
+        axes = (self.fig.add_subplot(2, 2, 1),
+                self.fig.add_subplot(2, 2, 2),
+                self.fig.add_subplot(2, 2, 3),
+                self.fig.add_subplot(2, 2, 4),
+                )
+        cax = axes[0].imshow(
+            corr,
+            aspect="equal",
+            interpolation="None",
+            vmin=-1,
+            vmax=1,
+            cmap=correlation_colormap)
+        axes[0].set_xlabel("1, -1 trap index")
+        axes[0].set_ylabel("1, 1 trap index")
+        axes[0].set_title("Total Atom Number Normalization")
+        af.save_array(corr, "total_norm_corr", self.current_folder)
+        cax = axes[1].imshow(
+            corr_sidemode,
+            aspect="equal",
+            interpolation="None",
+            vmin=-1,
+            vmax=1,
+            cmap=correlation_colormap)
+        axes[1].set_xlabel("1, -1 trap index")
+        axes[1].set_ylabel("1, 1 trap index")
+        axes[1].set_title("Sidemode Normalization")
+        af.save_array(corr_sidemode, "sidemode_norm_corr", self.current_folder)
+        positions = list(range(-n_traps + 1, n_traps))
+        total_diag = [np.mean(np.diagonal(corr, d)) for d in positions]
+        sidemode_diag = [np.mean(np.diagonal(corr_sidemode, d))
+                         for d in positions]
+        axes_num = 2
+        for diag in [total_diag, sidemode_diag]:
+            axes[axes_num].plot(positions, diag, 'o--')
+            axes[axes_num].set_xlabel("Distance (sites)")
+            axes[axes_num].set_ylabel("Correlation")
+            axes[axes_num].set_ylim(-1, 1)
+            axes_num += 1
+        af.save_array(total_diag, "total_norm_corr_1d", self.current_folder)
+        af.save_array(sidemode_diag, "sidemode_norm_corr_1d",
+                      self.current_folder)
+        axes[2].set_title("Total atom number normalization")
+        axes[3].set_title("Sidemode normalization")
+        af.save_figure(self.fig, "correlations", self.current_folder)
