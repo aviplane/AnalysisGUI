@@ -115,6 +115,7 @@ class FileSorter(QThread):
 
     def format_parameter(self, value):
         if hasattr(value, '__iter__'):
+            value = np.round(value, 4)
             return '-'.join(map(str, value))
         else:
             # not iterable
@@ -144,7 +145,12 @@ class FileSorter(QThread):
                                            allow_pickle=True))
             physics_probe_list = list(np.load(current_folder + "/fzx_probe.npy",
                                               allow_pickle=True))
-            all_fits = np.vstack([all_fits, np.array([fits])])
+            try:
+                all_fits = np.vstack([all_fits, np.array([fits])])
+            except ValueError:
+                print(f"Error with file: {file}")
+                traceback.print_exc()
+                return
             bare_probe_list.append(bare_probe)
             physics_probe_list.append(physics_probe)
             if xlabel == no_xlabel_string:

@@ -190,6 +190,7 @@ class PlotCorrelationWorker(PlotFitWorker):
         axes[0].set_xlabel("1, -1 trap index")
         axes[0].set_ylabel("1, 1 trap index")
         axes[0].set_title("Total Atom Number Normalization")
+        self.fig.colorbar(cax, ax=axes[0])
         af.save_array(corr, "total_norm_corr", self.current_folder)
         cax = axes[1].imshow(
             corr_sidemode,
@@ -201,6 +202,7 @@ class PlotCorrelationWorker(PlotFitWorker):
         axes[1].set_xlabel("1, -1 trap index")
         axes[1].set_ylabel("1, 1 trap index")
         axes[1].set_title("Sidemode Normalization")
+        self.fig.colorbar(cax, ax=axes[1])
         af.save_array(corr_sidemode, "sidemode_norm_corr", self.current_folder)
         positions = list(range(-n_traps + 1, n_traps))
         total_diag = [np.mean(np.diagonal(corr, d)) for d in positions]

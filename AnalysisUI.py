@@ -84,6 +84,12 @@ class AnalysisUI:
         # Add in parameter field
         self.grid_layout.addWidget(self.parameters_label, row_num, 0, 1, 1)
         self.grid_layout.addWidget(self.parameters_lineedit, row_num, 1, 1, 2)
+
+        row_num += 1
+        self.f2_threshold_checkbox = QCheckBox("F = 2 Thresholding")
+        self.threshold_layout = QHBoxLayout()
+
+        self.grid_layout.addWidget(self.)
         row_num = row_num + 1
         self.grid_layout.addWidget(
             self.go_button, row_num, 0, 1, self.n_columns)

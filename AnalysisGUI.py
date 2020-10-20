@@ -142,6 +142,11 @@ class AnalysisGUI(QMainWindow, AnalysisUI):
         max_value = self.corr_threshold_max.value() / 100
         self.corr_max_value.setText(f"{max_value:.2f}")
 
+        try:
+            self.make_plots(self.folder_to_plot)
+        except:
+            traceback.print_exc()
+
     def set_probe_threshold(self):
         try:
             current_folder = current_folder = f"{self.holding_folder}/{self.folder_to_plot}/"
@@ -264,6 +269,7 @@ class AnalysisGUI(QMainWindow, AnalysisUI):
             current_folder + "/fzx_probe.npy", allow_pickle=True)
         fits, xlabels = self.select_probe_threshold(
             fits, xlabels, physics_probes)
+        # TODO: Add in F = 2 Thresholding
         roi_labels = np.load(current_folder + "/roi_labels.npy")
         fit_mean, fit_std, xlabels = self.group_shot(fits, xlabels)
         fit_mean, fit_std = np.swapaxes(
@@ -339,7 +345,7 @@ class AnalysisGUI(QMainWindow, AnalysisUI):
                 np.linalg.norm(new_compensation)
             np.save(compensation_path, new_compensation)
             print("Engaging new scan")
-#            self.rm_client.engage()
+            self.rm_client.engage()
         return
 
     def make_probe_plot(self):
