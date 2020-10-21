@@ -77,10 +77,14 @@ class Plot1DWorker(PlotFitWorker):
                                           label=fancy_titles[label])
                     af.save_array(np.mean(state, axis=1),
                                   f"{label}_1d", self.current_folder)
+            axis.axhline(self.f2_threshold, color='r',
+                         linestyle='--', label="F = 2 Threshold")
             axis.legend()
             axis.set_ylabel("Average trap counts")
             axis.set_xlabel(f"{self.xlabel} ({self.units})")
+
             af.save_figure(self.fig, "1d_plot", self.current_folder)
+
         except:
             traceback.print_exc()
 

@@ -87,9 +87,12 @@ class AnalysisUI:
 
         row_num += 1
         self.f2_threshold_checkbox = QCheckBox("F = 2 Thresholding")
+        self.f2_threshold_input = QLineEdit("")
         self.threshold_layout = QHBoxLayout()
-
-        self.grid_layout.addWidget(self.)
+        self.threshold_layout.addWidget(self.f2_threshold_checkbox)
+        self.threshold_layout.addWidget(self.f2_threshold_input)
+        self.grid_layout.addLayout(
+            self.threshold_layout, row_num, 0, 1, self.n_columns)
         row_num = row_num + 1
         self.grid_layout.addWidget(
             self.go_button, row_num, 0, 1, self.n_columns)

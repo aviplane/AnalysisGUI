@@ -53,6 +53,9 @@ class AnalysisGUI(QMainWindow, AnalysisUI):
         self.cb_data.activated.connect(self.set_data_folder)
         self.picker_date.dateChanged.connect(self.set_date)
         self.parameters_lineedit.returnPressed.connect(self.set_parameters)
+        self.f2_threshold_input.returnPressed.connect(self.set_f2_threshold)
+        self.checkbox_adjust_amplitudes.stateChanged.connect(
+            self.set_f2_threshold)
         self.go_button.clicked.connect(
             self.make_sorter_thread)  # self.sort_all_files)
         self.checkbox_imaging_calibration.stateChanged.connect(
@@ -73,6 +76,7 @@ class AnalysisGUI(QMainWindow, AnalysisUI):
         self.rm_client = Client(host='171.64.58.213')
         self.threadpool = QThreadPool()
         self.parameters = ""
+        self.f2_threshold = 0
 
     def set_date(self, date):
         self.date = date.toString(date_format_string)
@@ -134,6 +138,19 @@ class AnalysisGUI(QMainWindow, AnalysisUI):
         except FileNotFoundError:
             print("Selected bad date, or bad folder?")
         return
+
+    def set_f2_threshold(self):
+        try:
+            self.f2_threshold = self.f2_threshold_checkbox.isChecked() * \
+                float(self.f2_threshold_input.text())
+        except Exception as e:
+            print(e)
+            traceback.print_exc()
+            self.f2_threshold = 0
+        try:
+            self.make_plots(self.folder_to_plot)
+        except:
+            traceback.print_exc()
 
     def set_corr_threshold(self):
         min_value = self.corr_threshold_min.value() / 100
@@ -271,12 +288,16 @@ class AnalysisGUI(QMainWindow, AnalysisUI):
             fits, xlabels, physics_probes)
         # TODO: Add in F = 2 Thresholding
         roi_labels = np.load(current_folder + "/roi_labels.npy")
+        fits, xlabels = self.select_f2_threshold(fits, xlabels, roi_labels)
+        if len(fits) < 1:
+            return
         fit_mean, fit_std, xlabels = self.group_shot(fits, xlabels)
         fit_mean, fit_std = np.swapaxes(
             fit_mean, 0, 1), np.swapaxes(fit_std, 0, 1)
         keys_adjusted = np.array(xlabels) * sf
         plot1dworker = Plot1DWorker(current_folder, self.figure_1d, xlabel, units,
                                     fit_mean, fit_std, roi_labels, keys_adjusted, rois_to_exclude=self.rois_to_exclude)
+        plot1dworker.f2_threshold = self.f2_threshold
         plot2dworker = Plot2DWorker(current_folder, self.figure_2d, xlabel, units,
                                     fit_mean, fit_std, roi_labels, keys_adjusted, rois_to_exclude=self.rois_to_exclude)
         self.threadpool.start(plot1dworker)
@@ -321,6 +342,12 @@ class AnalysisGUI(QMainWindow, AnalysisUI):
             indices_to_keep = mean_probe > self.probe_threshold_value
             return fits[indices_to_keep], xlabels[indices_to_keep]
         return fits, xlabels
+
+    def select_f2_threshold(self, fits, xlabels, roi_labels):
+        fit2 = fits[:, list(roi_labels).index("roi2orOther")]
+        fit2 = np.mean(fit2, axis=1)
+        mask = fit2 > self.f2_threshold
+        return fits[mask], xlabels[mask]
 
     def adjust_amplitude_compensation(self):
         current_folder = f"{self.holding_folder}/{self.folder_to_plot}/"
