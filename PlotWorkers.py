@@ -9,6 +9,7 @@ import traceback
 import math
 from colorcet import cm
 from sklearn.decomposition import PCA
+from scipy.stats import norm
 
 
 class PlotFitWorker(QRunnable):
@@ -77,6 +78,8 @@ class Plot1DWorker(PlotFitWorker):
                                           label=fancy_titles[label])
                     af.save_array(np.mean(state, axis=1),
                                   f"{label}_1d", self.current_folder)
+                    af.save_array(np.mean(state, axis=1),
+                                  f"{label}_1d_std", self.current_folder)
             axis.axhline(self.f2_threshold, color='r',
                          linestyle='--', label="F = 2 Threshold")
             axis.legend()
@@ -92,12 +95,20 @@ class Plot1DWorker(PlotFitWorker):
 class Plot1DHistogramWorker(PlotFitWorker):
     def run(self):
         try:
+            colors = ["tab:blue", "tab:orange", "tab:green",
+                      "tab:red", "tab:purple", "tab:brown", "tab:pink"]
             self.fig.clf()
             axis = self.fig.add_subplot(111)
-            for state, state_std, label in zip(self.fit_mean, self.fit_std, self.roi_labels):
+            for state, state_std, label, color in zip(self.fit_mean, self.fit_std, self.roi_labels, colors):
                 if label not in self.rois_to_exclude:
-                    axis.hist(np.mean(state, axis=1), bins='stone',
-                              label=fancy_titles[label])
+                    data = np.mean(state, axis=1)
+                    mean, std = norm.fit(data)
+                    out, bins, patches = axis.hist(data, bins='stone',
+                                                   label=f"{fancy_titles[label]} - Mean: {mean:.0f}, Std.: {std:.1f}",
+                                                   color=color)
+                    x = np.linspace(np.min(data), np.max(data))
+                    axis.plot(x, np.max(out) * norm.pdf(x, mean, std), c=color)
+
             axis.legend()
             axis.set_ylabel("Number of Shots")
             axis.set_xlabel(f"Imaging Counts")
@@ -108,13 +119,14 @@ class Plot1DHistogramWorker(PlotFitWorker):
 
 class PlotPCAWorker(PlotFitWorker):
     def run(self):
-        if self.fit_mean.shape[1] < 8:
+        print(self.fit_mean.shape)
+        if self.fit_mean.shape[0] < 8:
             return
         n_traps = self.fit_mean.shape[2]
         self.roi_labels = list(self.roi_labels)
-        fit_1m1 = self.fit_mean[self.roi_labels.index('roi1-1')]  # fit_sum
-        fit_1p1 = self.fit_mean[self.roi_labels.index('roi11')]  # fit_sum
-        fit_10 = self.fit_mean[self.roi_labels.index('roi10')]
+        fit_1m1 = self.fit_mean[:, self.roi_labels.index('roi1-1')]  # fit_sum
+        fit_1p1 = self.fit_mean[:, self.roi_labels.index('roi11')]  # fit_sum
+        fit_10 = self.fit_mean[:, self.roi_labels.index('roi10')]
         fit_sum = (fit_1m1 + fit_1p1 + fit_10)
         fit_1m1, fit_1p1 = fit_1m1 / fit_sum, fit_1p1 / fit_sum
 

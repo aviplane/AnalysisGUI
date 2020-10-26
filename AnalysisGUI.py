@@ -54,7 +54,7 @@ class AnalysisGUI(QMainWindow, AnalysisUI):
         self.picker_date.dateChanged.connect(self.set_date)
         self.parameters_lineedit.returnPressed.connect(self.set_parameters)
         self.f2_threshold_input.returnPressed.connect(self.set_f2_threshold)
-        self.checkbox_adjust_amplitudes.stateChanged.connect(
+        self.f2_threshold_checkbox.stateChanged.connect(
             self.set_f2_threshold)
         self.go_button.clicked.connect(
             self.make_sorter_thread)  # self.sort_all_files)
