@@ -12,6 +12,7 @@ import numpy as np
 from TweezerAnalysis import *
 from FormattingStrings import *
 from units import unitsDef
+from playsound import playsound
 
 
 class FileSorterSignal(QObject):
@@ -134,8 +135,10 @@ class FileSorter(QThread):
         if self.imaging_calibration:
             print("Adjusting ROIs")
             fits = self.adjust_rois(fits, roi_labels)
-        physics_probe, bare_probe = self.get_cavity_transmission(file)
+        physics_probe, bare_probe, alarm = self.get_cavity_transmission(file)
         print(file)
+        if "PairCreation" in current_folder and alarm:
+            playsound("beep.mp3")
         try:
             all_fits = np.load(current_folder + "/all_fits.npy")
             xlabels = np.load(current_folder + "/xlabels.npy")
@@ -189,7 +192,10 @@ class FileSorter(QThread):
             """
             TODO: Error Handling
             """
-        return self.__process_trace__(physics_probe), self.__process_trace__(bare_probe)
+        bare_probe_processed = self.__process_trace__(bare_probe)
+        if np.max(bare_probe_processed) < 6 * np.min(bare_probe_processed):
+            alarm = True
+        return self.__process_trace__(physics_probe), bare_probe_processed, alarm
 
     def __process_trace__(self, trace):
         return [i[1] for i in trace]
@@ -251,6 +257,7 @@ class FileSorter(QThread):
 
         if scan_globals["MeasurePairCreation"]:
             main_string = 'PairCreation_' + main_string
+            xlabel = "PR_IntDuration"
         if scan_globals["MeasureSpinExchange"]:
             main_string = "SpinExchange_" + main_string
         if scan_globals["CheckCavityShift"]:

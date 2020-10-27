@@ -344,12 +344,30 @@ class AnalysisGUI(QMainWindow, AnalysisUI):
         return fits, xlabels
 
     def select_f2_threshold(self, fits, xlabels, roi_labels):
+        """
+        Given a list of fits and xlabels, only return the fits + xlabels that
+        have F = 2 population > threshold set in the QtGui
+
+        Inputs:
+            fits: Shots x States x Traps array of data
+            xlabels: array of length shots with the appropriate vlaue of the xlabel
+            roi_labels: The order that the states in fits are.
+
+        Outputs:
+            fits: Thresholded Shots x States x Traps aray of data
+            xlabels: array of length (thresholded shots)
+        """
         fit2 = fits[:, list(roi_labels).index("roi2orOther")]
         fit2 = np.mean(fit2, axis=1)
         mask = fit2 > self.f2_threshold
         return fits[mask], xlabels[mask]
 
     def adjust_amplitude_compensation(self):
+        """
+        Look at the current atom uniformity, and update the relative trap powers
+        to optimize uniformity.  This function engages with the runmanager remote
+        client to automatically engage the next set.
+        """
         current_folder = f"{self.holding_folder}/{self.folder_to_plot}/"
         try:
             current_compensation = np.load(compensation_path)
@@ -421,6 +439,7 @@ class AnalysisGUI(QMainWindow, AnalysisUI):
         ax.legend()
         ax.set_ylabel("Mean APD Voltage")
         ax.set_xlabel(f"{xlabel} ({units})")
+        self.save_array(physics_means, "mean_probe_physics", current_folder)
         self.save_figure(self.figure_probe, "probe", current_folder)
         self.canvas_probe.draw()
 
