@@ -53,7 +53,7 @@ class FileSorter(QThread):
                     self.folder_to_plot)
             else:
                 print("No Folders made yet")
-            QThread.sleep(3)
+            QThread.sleep(1)
         print("Thread ended")
 
     def stop(self):
@@ -193,6 +193,7 @@ class FileSorter(QThread):
             TODO: Error Handling
             """
         bare_probe_processed = self.__process_trace__(bare_probe)
+        alarm = False
         if np.max(bare_probe_processed) < 6 * np.min(bare_probe_processed):
             alarm = True
         return self.__process_trace__(physics_probe), bare_probe_processed, alarm
@@ -240,6 +241,26 @@ class FileSorter(QThread):
         scan_time = basename(file_name).split("_")[0]
         return scan_time
 
+    def choose_xlabel(self, labels):
+        l = len(xlabels)
+        if len(labels) == 1:
+            #        if labels[0] == 'SP_RamseyPulsePhase':
+            #            raman_ramsey = True
+            #            return 'run number'
+            return labels[0]
+        elif len(labels) > 1:
+            if 'Tweezer_RamseyPhase' in labels:
+                return labels[(labels.index('Tweezer_RamseyPhase') + 1) % l]
+            if 'SP_RamseyPulsePhase' in labels:
+                return labels[(labels.index('SP_RamseyPulsePhase') + 1) % l]
+            if 'SP_A_RamseyPulsePhase' in labels:
+                return labels[(labels.index('SP_A_RamseyPulsePhase') + 1) % l]
+            if 'iteration' in labels:
+                return labels[(labels.index('iteration') + 1) % l]
+            if 'waitMonitor' in labels:
+                return labels[(labels.index('waitMonitor') + 1) % l]
+            return labels[1]
+
     def generate_folder_name(self, scan):
         print(scan)
         scan_files = [i for i in self.all_files if scan in i]
@@ -257,7 +278,6 @@ class FileSorter(QThread):
 
         if scan_globals["MeasurePairCreation"]:
             main_string = 'PairCreation_' + main_string
-            xlabel = "PR_IntDuration"
         if scan_globals["MeasureSpinExchange"]:
             main_string = "SpinExchange_" + main_string
         if scan_globals["CheckCavityShift"]:

@@ -280,10 +280,10 @@ class AnalysisGUI(QMainWindow, AnalysisUI):
         with open(current_folder + "/xlabel.txt", 'r') as xlabel_file:
             xlabel = xlabel_file.read().strip()
         sf, units = unitsDef(xlabel)
-        fits = np.load(current_folder + "/all_fits.npy")
-        xlabels = np.load(current_folder + "/xlabels.npy")
+        fits = np.load(current_folder + "/all_fits.npy")[1:]
+        xlabels = np.load(current_folder + "/xlabels.npy")[1:]
         physics_probes = np.load(
-            current_folder + "/fzx_probe.npy", allow_pickle=True)
+            current_folder + "/fzx_probe.npy", allow_pickle=True)[1:]
         fits, xlabels = self.select_probe_threshold(
             fits, xlabels, physics_probes)
         # TODO: Add in F = 2 Thresholding

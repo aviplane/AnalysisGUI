@@ -21,6 +21,7 @@ def unitsDef(xlabel_name):
                   'PR_RampDuration': 'ms',
                   "PR_RampHoldTime": "ms",
                   "PR_ModulationFreqs": "kHz",
+                  "PR_GradientPerSite": "kHz",
                   'Raman_SmallRamanDuration': 'us',
                   'Raman_MSDuration': 'us',
                   'SP_PiPulseDuration': 'us',

@@ -106,8 +106,11 @@ def save_figure(fig, title, current_folder, extra_directory="", extra_title=""):
     None.
 
     """
-    save_folder = f"{current_folder}\\{extra_directory}"
-    folder_to_plot = current_folder.split("\\")[-1].split("/")[-2]
+    current_folder = current_folder.replace("/", "\\")
+    save_folder = f"{current_folder}"
+    if extra_directory != "":
+        save_folder += "\\{extra_directory}"
+    folder_to_plot = current_folder.split("\\")[-2]
     if not os.path.isdir(save_folder):
         os.makedirs(save_folder)
     fig.tight_layout(rect=[0, 0.03, 1, 0.95])
@@ -116,7 +119,9 @@ def save_figure(fig, title, current_folder, extra_directory="", extra_title=""):
         title_string += f" | {extra_title}"
     fig.suptitle(title_string)
     print(f"{save_folder}{folder_to_plot}_{title}.png")
-    fig.savefig(f"{save_folder}{folder_to_plot}_{title}.png", dpi=200)
+    save_location = u'\\\\?\\' + f"{save_folder}{folder_to_plot}_{title}.png"
+    fig.savefig(
+        save_location, dpi=200)
 
 
 def save_array(data, title, current_folder, extra_directory=""):
@@ -138,12 +143,14 @@ def save_array(data, title, current_folder, extra_directory=""):
     None.
 
     """
+    current_folder = current_folder.replace("/", "\\")
     save_folder = f"{current_folder}"
-    folder_to_plot = current_folder.split("\\")[-1].split("/")[-2]
+    folder_to_plot = current_folder.split("\\")[-2]
     if not os.path.isdir(save_folder):
         os.makedirs(save_folder)
     try:
-        np.savetxt(f"{save_folder}{folder_to_plot}_{title}.txt", data)
+        np.savetxt(
+            u'\\\\?\\' + f"{save_folder}{folder_to_plot}_{title}.txt", data)
     except OSError:
         traceback.print_exc()
         print("Problem saving")
