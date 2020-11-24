@@ -24,6 +24,7 @@ class AnalysisUI:
         self.checkbox_imaging_calibration = QCheckBox("Imaging Calibration")
         self.checkbox_adjust_amplitudes = QCheckBox(
             "Amplitude Adjustment Feedback")
+        self.checkbox_ignore_first_shot = QCheckBox("Ignore First Shot")
 
         self.corr_min_label = QLabel("Sidemode Minimum Fraction: ")
         self.corr_max_label = QLabel("Sidemode Maximum Fraction: ")
@@ -53,7 +54,7 @@ class AnalysisUI:
 
         self.rois_selection = []
 
-        n_columns = 4
+        n_columns = 12
 
         self.go_button = QPushButton("Go")
 
@@ -67,17 +68,20 @@ class AnalysisUI:
         )
 
         row_num = row_num + 1
-        self.grid_layout.addWidget(
-            self.checkbox_imaging_calibration, row_num, 0, 1, 1)
-        self.grid_layout.addWidget(
-            self.checkbox_adjust_amplitudes, row_num, 1, 1, 1)
-        self.probe_threshold_layout = QHBoxLayout()
+        self.option_selector_layout = QHBoxLayout()
+        self.option_selector_layout.addWidget(
+            self.checkbox_imaging_calibration)
+        self.option_selector_layout.addWidget(
+            self.checkbox_adjust_amplitudes)
+        self.option_selector_layout.addWidget(self.checkbox_ignore_first_shot)
+
         self.grid_layout.addLayout(
-            self.probe_threshold_layout, row_num, 2, 1, 5)
-        self.probe_threshold_layout.addWidget(self.checkbox_probe_threhold)
-        self.probe_threshold_layout.addWidget(self.probe_threshold_label)
-        self.probe_threshold_layout.addWidget(self.probe_threshold)
-        self.probe_threshold_layout.addWidget(self.probe_threshold_value_label)
+            self.option_selector_layout, row_num, 0, 1, n_columns)
+        self.option_selector_layout.addWidget(self.checkbox_probe_threhold)
+        self.option_selector_layout.addWidget(self.probe_threshold_label)
+        self.option_selector_layout.addWidget(self.probe_threshold)
+        self.option_selector_layout.addWidget(self.probe_threshold_value_label)
+
         row_num = row_num + 1
         self.set_roi_selector(row_num)
         row_num += 1

@@ -254,12 +254,6 @@ def compute_rois_single_image(f, image):
     height = 40
     x_start = 180
     y_start = 870
-#    xshift=-105 * np.sin(rotangle * np.pi / 180)
-#    yshift=-105 * np.cos(rotangle * np.pi / 180)
-#    length = 1000
-#    height = 50
-#    x_start = 180
-#    y_start = 855#870
     bottomROIx, bottomROIy = np.array(
         [x_start, x_start + length]), np.array([y_start, y_start + height])
     xpts = np.array([bottomROIx + i * xshift for i in range(numStates)])

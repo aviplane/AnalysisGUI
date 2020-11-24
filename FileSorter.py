@@ -129,6 +129,7 @@ class FileSorter(QThread):
         """
         with open(current_folder + "/xlabel.txt", 'r') as xlabel_file:
             xlabel = xlabel_file.read().strip()
+        print(file)
         roi_labels, rois = af.extract_rois(file)
         file_globals = af.extract_globals(file)
         fits = np.apply_along_axis(trap_amplitudes, 1, rois, n_traps=18)
@@ -136,9 +137,9 @@ class FileSorter(QThread):
             print("Adjusting ROIs")
             fits = self.adjust_rois(fits, roi_labels)
         physics_probe, bare_probe, alarm = self.get_cavity_transmission(file)
-        print(file)
-        if "PairCreation" in current_folder and alarm:
-            playsound("beep.mp3")
+        if "PairCreation_" in current_folder and alarm:
+            print("Probe Out")
+            # playsound("beep.mp3")
         try:
             all_fits = np.load(current_folder + "/all_fits.npy")
             xlabels = np.load(current_folder + "/xlabels.npy")
@@ -194,7 +195,7 @@ class FileSorter(QThread):
             """
         bare_probe_processed = self.__process_trace__(bare_probe)
         alarm = False
-        if np.max(bare_probe_processed) < 6 * np.min(bare_probe_processed):
+        if np.max(bare_probe_processed) < 4 * np.min(bare_probe_processed):
             alarm = True
         return self.__process_trace__(physics_probe), bare_probe_processed, alarm
 

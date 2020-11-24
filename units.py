@@ -24,6 +24,9 @@ def unitsDef(xlabel_name):
                   "PR_GradientPerSite": "kHz",
                   'Raman_SmallRamanDuration': 'us',
                   'Raman_MSDuration': 'us',
+                  'Raman_BigRamanRamseyDuration': 'us',
+                  'Raman_RamseyTime': 'us',
+                  'Raman_RamseyPhaseOffset': 'deg',
                   'SP_PiPulseDuration': 'us',
                   'SP_BigRamanPiTime': 'us',
                   'SP_SpinEchoDuration': 'us',
@@ -43,7 +46,8 @@ def unitsDef(xlabel_name):
                         'ms': 1e3,
                         'MHz': 1,
                         'kHz': 1e3,
-                        'V': 1}
+                        'V': 1,
+                        'deg': 1}
     if xlabel_name == 'ProbeCenterSweep':
         scale_factor = 1
         units = 'MHz'

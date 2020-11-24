@@ -62,6 +62,9 @@ class AnalysisGUI(QMainWindow, AnalysisUI):
             self.set_imaging_calibration)
         self.checkbox_adjust_amplitudes.stateChanged.connect(
             self.set_amplitude_feedback)
+        self.checkbox_ignore_first_shot.stateChanged.connect(
+            self.set_ignore_first_shot
+        )
         self.corr_threshold_min.sliderReleased.connect(self.set_corr_threshold)
         self.corr_threshold_max.sliderReleased.connect(self.set_corr_threshold)
         self.probe_threshold.sliderReleased.connect(self.set_probe_threshold)
@@ -77,6 +80,7 @@ class AnalysisGUI(QMainWindow, AnalysisUI):
         self.threadpool = QThreadPool()
         self.parameters = ""
         self.f2_threshold = 0
+        self.ignore_first_shot = False
 
     def set_date(self, date):
         self.date = date.toString(date_format_string)
@@ -88,6 +92,14 @@ class AnalysisGUI(QMainWindow, AnalysisUI):
             self.worker.imaging_calibration = self.imaging_calibration
         except Exception as e:
             print(e, "trying to turn on imaging calibration")
+
+    def set_ignore_first_shot(self):
+        self.ignore_first_shot = self.checkbox_ignore_first_shot.isChecked()
+        try:
+            self.make_plots()
+        except:
+            print("Error making plots after setting ignore first shots")
+            traceback.print_exc()
 
     def set_parameters(self):
         parameter_text = self.parameters_lineedit.text()
@@ -280,10 +292,14 @@ class AnalysisGUI(QMainWindow, AnalysisUI):
         with open(current_folder + "/xlabel.txt", 'r') as xlabel_file:
             xlabel = xlabel_file.read().strip()
         sf, units = unitsDef(xlabel)
-        fits = np.load(current_folder + "/all_fits.npy")[1:]
-        xlabels = np.load(current_folder + "/xlabels.npy")[1:]
+        fits = np.load(current_folder + "/all_fits.npy")
+        xlabels = np.load(current_folder + "/xlabels.npy")
         physics_probes = np.load(
-            current_folder + "/fzx_probe.npy", allow_pickle=True)[1:]
+            current_folder + "/fzx_probe.npy", allow_pickle=True)
+        if self.ignore_first_shot:
+            fits = fits[1:]
+            xlabels = xlabels[1:]
+            physics_probes = physics_probes[1:]
         fits, xlabels = self.select_probe_threshold(
             fits, xlabels, physics_probes)
         # TODO: Add in F = 2 Thresholding
