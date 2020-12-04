@@ -13,6 +13,7 @@ from TweezerAnalysis import *
 from FormattingStrings import *
 from units import unitsDef
 from playsound import playsound
+import importlib
 
 
 class FileSorterSignal(QObject):
@@ -34,6 +35,8 @@ class FileSorter(QThread):
         self.folder_to_plot = False
         self.imaging_calibration = imaging_calibration
         self.parameters = []
+        self.delete_reps = False
+
         try:
             with open(self.holding_folder + "/folder_dict.json", 'r') as dict_file:
                 self.data_folder_dict = json.loads(dict_file.read())
@@ -63,6 +66,7 @@ class FileSorter(QThread):
         self.terminate()
 
     def get_unanalyzed_files(self):
+        # TODO: reload units
         try:
             search_folder = af.get_holding_folder(
                 self.script_folder, data_date=self.date)
@@ -79,6 +83,9 @@ class FileSorter(QThread):
             return []
 
     def sort_files(self, files):
+        if self.delete_reps:
+            print("Attempting to delete reps...")
+        # iterator??
         scans = [self.get_scan_time(file) for file in files]
         for scan, file in zip(scans, files):
             if scan not in self.data_folder_dict.keys():
@@ -263,7 +270,6 @@ class FileSorter(QThread):
             return labels[1]
 
     def generate_folder_name(self, scan):
-        print(scan)
         scan_files = [i for i in self.all_files if scan in i]
         scan_globals = af.extract_globals(scan_files[0])
         xlabels = af.get_xlabel(scan_files)

@@ -187,9 +187,8 @@ class PlotCorrelationWorker(PlotFitWorker):
         corr = np.corrcoef(
             (fit_1m1 / fit_sum).T,
             (fit_1p1 / fit_sum).T)[:n_traps, n_traps:]
-        corr_sidemode = np.corrcoef(
-            (fit_1m1 / fit_sidemode).T,
-            (fit_1p1 / fit_sidemode).T)[:n_traps, n_traps:]
+        pol = (fit_1p1 - fit_1m1) / fit_sum
+        corr_sidemode = np.cov(pol, rowvar=False)
         self.fig.clf()
         axes = (self.fig.add_subplot(2, 2, 1),
                 self.fig.add_subplot(2, 2, 2),
@@ -208,18 +207,19 @@ class PlotCorrelationWorker(PlotFitWorker):
         axes[0].set_title("Total Atom Number Normalization")
         self.fig.colorbar(cax, ax=axes[0])
         af.save_array(corr, "total_norm_corr", self.current_folder)
+        pol_cov_mag = np.max(np.abs(corr_sidemode))
         cax = axes[1].imshow(
             corr_sidemode,
             aspect="equal",
             interpolation="None",
-            vmin=-1,
-            vmax=1,
+            vmin=-pol_cov_mag,
+            vmax=pol_cov_mag,
             cmap=correlation_colormap)
         axes[1].set_xlabel("1, -1 trap index")
         axes[1].set_ylabel("1, 1 trap index")
-        axes[1].set_title("Sidemode Normalization")
+        axes[1].set_title("Polarization Covariance (Not normalized)")
         self.fig.colorbar(cax, ax=axes[1])
-        af.save_array(corr_sidemode, "sidemode_norm_corr", self.current_folder)
+        af.save_array(corr_sidemode, "pol_cov", self.current_folder)
         positions = list(range(-n_traps + 1, n_traps))
         total_diag = [np.mean(np.diagonal(corr, d)) for d in positions]
         sidemode_diag = [np.mean(np.diagonal(corr_sidemode, d))
@@ -231,8 +231,10 @@ class PlotCorrelationWorker(PlotFitWorker):
             axes[axes_num].set_ylabel("Correlation")
             axes[axes_num].set_ylim(-1, 1)
             axes_num += 1
+        mag = np.max(np.abs(sidemode_diag))
+        axes[3].set_ylim(-mag, mag)
         af.save_array(total_diag, "total_norm_corr_1d", self.current_folder)
-        af.save_array(sidemode_diag, "sidemode_norm_corr_1d",
+        af.save_array(sidemode_diag, "pol_cov_1d",
                       self.current_folder)
         axes[2].set_title("Total atom number normalization")
         axes[3].set_title("Sidemode normalization")

@@ -16,7 +16,7 @@ import matplotlib.pyplot as plt
 
 
 def n_trap_func(position, *params):
-    n_traps = (len(params) - 3)
+    n_traps = (len(params) - 4)
 
     first_trap = params[0]
     trap_spacing = params[1]
@@ -26,7 +26,8 @@ def n_trap_func(position, *params):
         first_trap + trap_spacing * n_traps,
         trap_spacing
     )
-    amps = params[3:]
+    offset = params[3]
+    amps = params[4:]
     #offsets = params[4::2]
     # lorentzian(x, A, full_width, x0, offset):
     gx = np.sum(
@@ -38,30 +39,34 @@ def n_trap_func(position, *params):
 
 
 def make_guess(roi, n_traps):
-    first_trap_guess = 30.5  # np.argmax(roi[:45])
+    first_trap_guess = np.argmax(roi[25:55]) + 25
     trap_spacing_guess = 34.7
     amp_guess = np.ones(n_traps) * max(np.max(roi), 1) * 2 / 3
     width_guess = 8.5
-    offset_guess = np.zeros(n_traps)
-    guess = np.empty((n_traps + 3,), dtype=np.float32)
+    offset_guess = 0
+    guess = np.empty((n_traps + 4,), dtype=np.float32)
 
     guess[0] = first_trap_guess
     guess[1] = trap_spacing_guess
     guess[2] = width_guess
-    guess[3:] = amp_guess
+    guess[3] = offset_guess
+    guess[4:] = amp_guess
     #guess[4::2] = offset_guess
     return tuple(guess)
 
 
 def make_bounds(roi, n_traps):
-    lower = np.zeros(n_traps + 3)
+    lower = np.zeros(n_traps + 4)
+    lower[0] = 25
+    lower[3] = -5000
     lower[2] = 3
     #lower[4::2] = -1000
-    upper = np.ones(n_traps + 3)
-    upper[0] = 200
+    upper = np.ones(n_traps + 4)
+    upper[0] = 55
     upper[1] = 80
     upper[2] = 20
-    upper[3:] = max(np.max(roi), 1)
+    upper[3] = 5000
+    upper[4:] = max(np.max(roi), 1)
     #upper[4::2] = 1000
     return (lower, upper)
 
@@ -84,7 +89,7 @@ def trap_amplitudes(roi, n_traps, plot=False):
     position = np.arange(len(roi))
     popt, _ = optimize.curve_fit(
         n_trap_func, position, roi, p0=guess, bounds=bounds, xtol=.1, ftol=.01)
-    amps = popt[3::]
+    amps = popt[4::]
     if plot:
         fig, ax = plt.subplots()
         ax.plot(roi)

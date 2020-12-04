@@ -25,6 +25,7 @@ class AnalysisUI:
         self.checkbox_adjust_amplitudes = QCheckBox(
             "Amplitude Adjustment Feedback")
         self.checkbox_ignore_first_shot = QCheckBox("Ignore First Shot")
+        self.checkbox_delete_reps = QCheckBox("Delete Reps")
 
         self.corr_min_label = QLabel("Sidemode Minimum Fraction: ")
         self.corr_max_label = QLabel("Sidemode Maximum Fraction: ")
@@ -74,13 +75,14 @@ class AnalysisUI:
         self.option_selector_layout.addWidget(
             self.checkbox_adjust_amplitudes)
         self.option_selector_layout.addWidget(self.checkbox_ignore_first_shot)
-
-        self.grid_layout.addLayout(
-            self.option_selector_layout, row_num, 0, 1, n_columns)
+        self.option_selector_layout.addWidget(self.checkbox_delete_reps)
         self.option_selector_layout.addWidget(self.checkbox_probe_threhold)
         self.option_selector_layout.addWidget(self.probe_threshold_label)
         self.option_selector_layout.addWidget(self.probe_threshold)
         self.option_selector_layout.addWidget(self.probe_threshold_value_label)
+
+        self.grid_layout.addLayout(
+            self.option_selector_layout, row_num, 0, 1, n_columns)
 
         row_num = row_num + 1
         self.set_roi_selector(row_num)

@@ -101,6 +101,14 @@ class AnalysisGUI(QMainWindow, AnalysisUI):
             print("Error making plots after setting ignore first shots")
             traceback.print_exc()
 
+    def set_delete_reps(self):
+        delete_reps = self.checkbox_delete_reps.isChecked()
+        try:
+            self.worker.delete_reps = delete_reps
+        except AttributeError as e:
+            print(
+                f"Trying to set delete reps to {delete_reps}, but no file sorter worker yet...")
+
     def set_parameters(self):
         parameter_text = self.parameters_lineedit.text()
         parameter_list = [i.strip() for i in parameter_text.split(",")]
@@ -395,7 +403,7 @@ class AnalysisGUI(QMainWindow, AnalysisUI):
         fit_10 = fits[:, roi_labels.index('roi10')]
         fit_1m1 = fits[:, roi_labels.index('roi1-1')]
         fit_1p1 = fits[:, roi_labels.index('roi11')]
-        fit_sum = fit_10 + fit_1m1 + fit_1p1
+        fit_sum = fit_10  # + fit_1m1 + fit_1p1
         trap_values = np.mean(fit_sum, axis=0)
         compensation = trap_values[::-1] ** (-1 / 2)
         if len(fit_sum) > 5 and len(fit_sum) % 6 == 0:

@@ -27,6 +27,8 @@ def unitsDef(xlabel_name):
                   'Raman_BigRamanRamseyDuration': 'us',
                   'Raman_RamseyTime': 'us',
                   'Raman_RamseyPhaseOffset': 'deg',
+                  'Raman_GradientPerSite': 'kHz',
+                  'Raman_SmallRamanPiHalf': 'us',
                   'SP_PiPulseDuration': 'us',
                   'SP_BigRamanPiTime': 'us',
                   'SP_SpinEchoDuration': 'us',
