@@ -17,6 +17,7 @@ magnetization_colormap = colorcet.cm.coolwarm
 phase_colormap = "hsv"
 contrast_colormap = colorcet.cm.fire
 correlation_colormap = colorcet.cm.coolwarm
+atom_cmap = colorcet.cm.blues
 
 
 def transparent_edge_plot(ax, x, y, yerr=None, marker='o', ms=12, **kwargs):

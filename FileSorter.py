@@ -191,12 +191,13 @@ class FileSorter(QThread):
         return
 
     def get_cavity_transmission(self, file):
-        bare_probe = rf.getdata(file, "GreyCavityTransmissionBare")
         try:
+            bare_probe = rf.getdata(file, "GreyCavityTransmissionBare")
             physics_probe = rf.getdata(file, "GreyCavityTransmissionProbe")
         except Exception as e:
             print(e)
             physics_probe = [(0, 0), (1, 0)]
+            bare_probe = [(0, 0), (1, 0)]
             """
             TODO: Error Handling
             """
@@ -239,7 +240,7 @@ class FileSorter(QThread):
     def get_global(self, file_globals, xlabel):
         xlabel_value = file_globals[xlabel]
         if hasattr(xlabel_value, '__iter__'):
-            return sorted(xlabel_value)[0]
+            return xlabel_value[0]
         return xlabel_value
 
     def process_xlabel(self, xlabel):

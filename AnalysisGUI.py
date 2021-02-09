@@ -263,7 +263,9 @@ class AnalysisGUI(QMainWindow, AnalysisUI):
         if extra_title:
             title_string += f" | {extra_title}"
         fig.suptitle(title_string)
-        fig.savefig(f"{save_folder}{self.folder_to_plot}_{title}.png", dpi=200)
+        save_location = u'\\\\?\\' + \
+            f"{save_folder}{self.folder_to_plot}_{title}.png"
+        fig.savefig(save_location, dpi=200)
 
     def save_array(self, data, title, current_folder, extra_directory=""):
         """
@@ -403,7 +405,7 @@ class AnalysisGUI(QMainWindow, AnalysisUI):
         fit_10 = fits[:, roi_labels.index('roi10')]
         fit_1m1 = fits[:, roi_labels.index('roi1-1')]
         fit_1p1 = fits[:, roi_labels.index('roi11')]
-        fit_sum = fit_10  # + fit_1m1 + fit_1p1
+        fit_sum = fit_10 + fit_1m1 + fit_1p1
         trap_values = np.mean(fit_sum, axis=0)
         compensation = trap_values[::-1] ** (-1 / 2)
         if len(fit_sum) > 5 and len(fit_sum) % 6 == 0:
@@ -463,8 +465,8 @@ class AnalysisGUI(QMainWindow, AnalysisUI):
         ax.legend()
         ax.set_ylabel("Mean APD Voltage")
         ax.set_xlabel(f"{xlabel} ({units})")
-        self.save_array(physics_means, "mean_probe_physics", current_folder)
-        self.save_figure(self.figure_probe, "probe", current_folder)
+        af.save_array(physics_means, "mean_probe_physics", current_folder)
+        af.save_figure(self.figure_probe, "probe", current_folder)
         self.canvas_probe.draw()
 
     def __mean_probe_value__(self, probe):
@@ -516,7 +518,7 @@ class AnalysisGUI(QMainWindow, AnalysisUI):
         self.figure_corr.colorbar(cax, ax=ax)
         ax.set_ylabel(f"{xlabel} ({units})")
         ax.set_xlabel(f"Trap Index")
-        self.save_figure(self.figure_corr, "magnetization", current_folder)
+        af.save_figure(self.figure_corr, "magnetization", current_folder)
         self.canvas_corr.draw()
 
     def make_correlation_plot(self):
@@ -579,7 +581,7 @@ class AnalysisGUI(QMainWindow, AnalysisUI):
             self.corr_cb = self.figure_corr.colorbar(cax, ax=self.axis_corr[1])
 
         self.save_array(corr, "corr_total", current_folder)
-        self.save_figure(self.figure_corr, "2d_correlation", current_folder)
+        af.save_figure(self.figure_corr, "2d_correlation", current_folder)
 
         self.figure_phase.clf()
 
@@ -601,8 +603,8 @@ class AnalysisGUI(QMainWindow, AnalysisUI):
         ax_total.set_xlabel("Distance (sites)")
         ax_total.set_ylabel("Correlation")
         ax_total.set_ylim(None, 1)
-        self.save_array(total_diag, "corr_1d_total", current_folder)
-        self.save_figure(self.figure_phase, "1d_correlation", current_folder)
+        af.save_array(total_diag, "corr_1d_total", current_folder)
+        af.save_figure(self.figure_phase, "1d_correlation", current_folder)
         self.canvas_corr.draw()
         self.canvas_phase.draw()
 
@@ -677,7 +679,7 @@ class AnalysisGUI(QMainWindow, AnalysisUI):
         cax = ax_y.imshow(y_pol, cmap=magnetization_colormap, aspect="auto", extent=extent,
                           vmin=-1, vmax=1)
         self.figure_phase.colorbar(cax, ax=ax_y)
-        self.save_figure(self.figure_phase, "phase_plot", current_folder)
+        af.save_figure(self.figure_phase, "phase_plot", current_folder)
 
         self.canvas_phase.draw()
 

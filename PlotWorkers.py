@@ -46,7 +46,7 @@ class Plot2DWorker(PlotFitWorker):
                 label = self.roi_labels[i]
                 ax = self.fig.add_subplot(n_rows, n_columns, e + 1)
                 cax = ax.imshow(self.fit_mean[i], aspect="auto",
-                                cmap=cm.blues, extent=extent, vmin=0)
+                                cmap=atom_cmap, extent=extent, vmin=0)
                 af.save_array(self.fit_mean[i], label, self.current_folder)
                 self.fig.colorbar(cax, ax=ax, label="Fitted counts")
                 if label in fancy_titles.keys():

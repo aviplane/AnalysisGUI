@@ -65,7 +65,7 @@ class AnalysisUI:
         self.grid_layout.addWidget(self.cb_data, row_num, 2, 1, 1)
         self.grid_layout.addWidget(
             self.label_folder_name,
-            row_num, 3, 1, n_columns - 2
+            row_num, 3, 1, n_columns - 3
         )
 
         row_num = row_num + 1
@@ -82,7 +82,7 @@ class AnalysisUI:
         self.option_selector_layout.addWidget(self.probe_threshold_value_label)
 
         self.grid_layout.addLayout(
-            self.option_selector_layout, row_num, 0, 1, n_columns)
+            self.option_selector_layout, row_num, 0, 1, n_columns - 1)
 
         row_num = row_num + 1
         self.set_roi_selector(row_num)
@@ -182,11 +182,15 @@ class AnalysisUI:
     def set_roi_selector(self, row_num=2):
         self.n_columns = 12
         self.roi_selector_label = QLabel("ROIs to exclude:")
+        self.roi_selector_layout = QHBoxLayout()
+        self.grid_layout.addLayout(
+            self.roi_selector_layout, row_num, 0, 1, self.n_columns)
         rois = sorted(list(fancy_titles.keys()))
         self.roi_checkboxes = [QCheckBox(roi) for roi in rois]
-        self.grid_layout.addWidget(self.roi_selector_label, 2, 0, 1, 1)
+        self.roi_selector_layout.addWidget(self.roi_selector_label)
         for i in range(len(self.roi_checkboxes)):
-            self.grid_layout.addWidget(self.roi_checkboxes[i], 2, i + 1, 1, 1)
+            self.roi_selector_layout.addWidget(
+                self.roi_checkboxes[i])
 
     def check_roi_boxes(self):
         self.rois_to_exclude = [i.text()
