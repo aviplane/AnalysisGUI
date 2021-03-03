@@ -12,4 +12,9 @@ fancy_titles = {"roi1-1": "1, -1 Atoms",
                 "roi2": "F = 2 Atoms",
                 "roiAll": "All atoms"}
 
-compensation_path = "S:\\Schleier Lab Dropbox\\Cavity Lab Data\\Cavity Lab Scripts\\cavity_labscriptlib\\RbCavity\\amplitude_compensation.npy"
+
+compensation_folder = "S:\\Schleier Lab Dropbox\\Cavity Lab Data\\Cavity Lab Scripts\\cavity_labscriptlib\\RbCavity"
+
+
+def compensation_path(n_traps):
+    return f"{compensation_folder}\\amplitude_compensation_{n_traps}.npy"

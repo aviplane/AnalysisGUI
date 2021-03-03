@@ -319,8 +319,11 @@ class AnalysisGUI(QMainWindow, AnalysisUI):
         if len(fits) < 1:
             return
         fit_mean, fit_std, xlabels = self.group_shot(fits, xlabels)
+
+        # roi x Shots X Site
         fit_mean, fit_std = np.swapaxes(
             fit_mean, 0, 1), np.swapaxes(fit_std, 0, 1)
+
         keys_adjusted = np.array(xlabels) * sf
         plot1dworker = Plot1DWorker(current_folder, self.figure_1d, xlabel, units,
                                     fit_mean, fit_std, roi_labels, keys_adjusted, rois_to_exclude=self.rois_to_exclude)
@@ -329,14 +332,14 @@ class AnalysisGUI(QMainWindow, AnalysisUI):
                                     fit_mean, fit_std, roi_labels, keys_adjusted, rois_to_exclude=self.rois_to_exclude)
         self.threadpool.start(plot1dworker)
         self.threadpool.start(plot2dworker)
-#        self.make_1d_plot()
-#        self.make_2d_plot()
+
         if self.amplitude_feedback and 'reps' in folder_to_plot:
-            self.adjust_amplitude_compensation()
+            n_traps = fit_mean.shape[-1]
+            print(fit_mean.shape)
+            self.adjust_amplitude_compensation(n_traps)
         self.make_probe_plot()
         if "PairCreation" in self.folder_to_plot and 'time' not in self.folder_to_plot:
             self.canvas_corr.setFixedHeight(600)
-            # self.make_correlation_plot()
             threshold_low = self.corr_threshold_min.value() / 100
             threshold_high = self.corr_threshold_max.value() / 100
             plotPCAworker = PlotPCAWorker(
@@ -389,18 +392,22 @@ class AnalysisGUI(QMainWindow, AnalysisUI):
         mask = fit2 > self.f2_threshold
         return fits[mask], xlabels[mask]
 
-    def adjust_amplitude_compensation(self):
+    def adjust_amplitude_compensation(self, n_traps):
         """
         Look at the current atom uniformity, and update the relative trap powers
         to optimize uniformity.  This function engages with the runmanager remote
         client to automatically engage the next set.
+
+        Inputs: n_traps
         """
         current_folder = f"{self.holding_folder}/{self.folder_to_plot}/"
+        saved_path = compensation_path(n_traps)
+        print(f"Attempting to load from {saved_path}")
         try:
-            current_compensation = np.load(compensation_path)
+            current_compensation = np.load(saved_path)
         except Exception as e:
             print(e)
-            current_compensation = np.ones(18)
+            current_compensation = np.ones(n_traps)
         fits = np.load(current_folder + "/all_fits.npy")
         roi_labels = list(np.load(current_folder + "/roi_labels.npy"))
         fit_10 = fits[:, roi_labels.index('roi10')]
@@ -408,7 +415,9 @@ class AnalysisGUI(QMainWindow, AnalysisUI):
         fit_1p1 = fits[:, roi_labels.index('roi11')]
         fit_sum = fit_10 + fit_1m1 + fit_1p1
         trap_values = np.mean(fit_sum, axis=0)
-        compensation = trap_values[::-1] ** (-1 / 2)
+        assert n_traps == len(trap_values)
+        # Reverse, since the frequency -> trap ordering is reversed
+        compensation = trap_values[::-1] ** (-1 / 3)
         if len(fit_sum) > 5 and len(fit_sum) % 6 == 0:
             trap_values = np.mean(fit_sum, axis=0)
             compensation = trap_values[::-1] ** (-1 / 2)
@@ -420,7 +429,8 @@ class AnalysisGUI(QMainWindow, AnalysisUI):
             new_compensation = current_compensation * compensation
             new_compensation = new_compensation / \
                 np.linalg.norm(new_compensation)
-            np.save(compensation_path, new_compensation)
+            print(f"saving new compensation to {saved_path}")
+            np.save(saved_path, new_compensation)
             print("Engaging new scan")
             self.rm_client.engage()
         return
@@ -526,93 +536,6 @@ class AnalysisGUI(QMainWindow, AnalysisUI):
         ax.set_xlabel(f"Trap Index")
         af.save_figure(self.figure_corr, "magnetization", current_folder)
         self.canvas_corr.draw()
-
-    def make_correlation_plot(self):
-        n_traps = 18
-        current_folder = f"{self.holding_folder}/{self.folder_to_plot}/"
-        fits = np.load(current_folder + "/all_fits.npy")
-        xlabels = np.load(current_folder + "/xlabels.npy")
-        physics_probes = np.load(
-            current_folder + "/fzx_probe.npy", allow_pickle=True)
-        fits, xlabels = self.select_probe_threshold(
-            fits, xlabels, physics_probes)
-        roi_labels = list(np.load(current_folder + "/roi_labels.npy"))
-        fit_10 = fits[:, roi_labels.index('roi10')]
-        fit_1m1 = fits[:, roi_labels.index('roi1-1')]
-        fit_1p1 = fits[:, roi_labels.index('roi11')]
-        fit_sum = fit_10 + fit_1m1 + fit_1p1
-        fit_1m1, fit_1p1 = fit_1m1 / fit_sum, fit_1p1 / fit_sum
-        threshold_low = self.corr_threshold_min.value() / 100
-        threshold_high = self.corr_threshold_max.value() / 100
-        sidemode = np.mean(fit_1m1 + fit_1p1, axis=1)
-        threshold_index = np.where((sidemode >= threshold_low) &
-                                   (sidemode < threshold_high))
-
-        if threshold_low > threshold_high:
-            return
-        fit_1m1 = fit_1m1[threshold_index]
-        fit_1p1 = fit_1p1[threshold_index]
-        corr = np.corrcoef(fit_1m1.T, fit_1p1.T)[:n_traps, n_traps:]
-        self.figure_corr.clear()
-        self.axis_corr = (self.figure_corr.add_subplot(1, 2, 1),
-                          self.figure_corr.add_subplot(1, 2, 2))
-        cax = self.axis_corr[0].imshow(
-            corr,
-            aspect="auto",
-            interpolation="None",
-            vmin=-1,
-            vmax=1,
-            cmap=correlation_colormap)
-        self.axis_corr[0].set_xlabel("1, -1 trap index")
-        self.axis_corr[0].set_ylabel("1, 1 trap index")
-        self.axis_corr[0].set_title("Total")
-
-        if len(fit_1m1) > 8:
-            adjacent_corr = np.mean(np.array(
-                [np.corrcoef(fit_1m1.T[:, i:i + 2], fit_1p1.T[:, i:i + 2])[:n_traps, n_traps:]
-                 for i in range(len(fit_1m1) - 2)]), axis=0)
-            cax = self.axis_corr[1].imshow(
-                adjacent_corr, aspect="auto", interpolation="None", vmin=-1, vmax=1, cmap=correlation_colormap)
-            self.axis_corr[1].set_xlabel("1, -1 trap index")
-            self.axis_corr[1].set_ylabel("1, 1 trap index")
-            self.axis_corr[1].set_title("Adjacent")
-            self.save_array(adjacent_corr, "corr_adjacent", current_folder)
-
-        try:
-            if not self.corr_cb:
-                self.corr_cb = self.figure_corr.colorbar(
-                    cax, ax=self.axis_corr[1])
-        except:
-            print("No colorbar")
-            self.corr_cb = self.figure_corr.colorbar(cax, ax=self.axis_corr[1])
-
-        self.save_array(corr, "corr_total", current_folder)
-        af.save_figure(self.figure_corr, "2d_correlation", current_folder)
-
-        self.figure_phase.clf()
-
-        ax_total = self.figure_phase.add_subplot(1, 2, 1)
-        positions = list(range(-n_traps + 1, n_traps))
-        total_diag = [np.mean(np.diagonal(corr, d)) for d in positions]
-        ax_total.plot(positions, total_diag)
-        try:
-            adjacent_diag = [np.mean(np.diagonal(adjacent_corr, d))
-                             for d in positions]
-            ax_adjacent = self.figure_phase.add_subplot(1, 2, 2)
-            ax_adjacent.plot(positions, adjacent_diag)
-            ax_adjacent.set_ylim(None, 1)
-            ax_adjacent.set_xlabel("Distance (sites)")
-            ax_adjacent.set_ylabel("Correlation")
-            self.save_array(adjacent_diag, "corr_1d_adjacent", current_folder)
-        except Exception as e:
-            print(e)
-        ax_total.set_xlabel("Distance (sites)")
-        ax_total.set_ylabel("Correlation")
-        ax_total.set_ylim(None, 1)
-        af.save_array(total_diag, "corr_1d_total", current_folder)
-        af.save_figure(self.figure_phase, "1d_correlation", current_folder)
-        self.canvas_corr.draw()
-        self.canvas_phase.draw()
 
     def make_phase_plot(self):
         current_folder = f"{self.holding_folder}/{self.folder_to_plot}/"

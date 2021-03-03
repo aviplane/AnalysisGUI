@@ -176,6 +176,14 @@ class AnalysisUI:
         self.canvas_probe.setFixedHeight(600)
         self.canvas_2d.setFixedHeight(600)
 
+        row_num += 2
+        self.reset_layout = QHBoxLayout()
+        self.reset_amplitude_compensation_button = QPushButton(
+            "Reset Amplitude Compensation - NOT IMPLEMENTED YET")
+        self.reset_layout.addWidget(self.reset_amplitude_compensation_button)
+        self.grid_layout.addLayout(
+            self.threshold_layout, row_num, 0, 1, self.n_columns)
+
         AnalysisGUI.setCentralWidget(self.scroll_area)
         QMetaObject.connectSlotsByName(AnalysisGUI)
 
