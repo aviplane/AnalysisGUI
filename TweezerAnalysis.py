@@ -40,7 +40,7 @@ def n_trap_func(position, *params):
 
 def make_guess(roi, n_traps):
     first_trap_guess = np.argmax(roi[15:35]) + 15
-    trap_spacing_guess = 34.7
+    trap_spacing_guess = 34.7 / 2 if n_traps > 19 else 34.7
     amp_guess = np.ones(n_traps) * max(np.max(roi), 1) * 2 / 3
     width_guess = 8.5
     offset_guess = 0

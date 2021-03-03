@@ -12,6 +12,26 @@ from sklearn.decomposition import PCA
 from scipy.stats import norm
 
 
+class ProbePlotWorker(QRunnable):
+    def __init__(self, current_folder, fig, xlabel, units, keys_adjusted, bare_probes, rigol_probes):
+        """
+        """
+        return
+
+    def run(self):
+        """
+        """
+        self.fig.clf()
+        ##nrows, n_cols, index
+        ax_bare = self.fig.add_subplot(121)
+        ax_probe = self.fig.add_subplot(122)
+        probe_values = [np.mean(i) for i in rigol_probes]
+        transparent_edge_plot(ax_probe, keys_adjusted, rigol_probes)
+        ax_probe.set_xlabel(f"{self.xlabel} ({self.units})")
+        ax_probe.set_ylabel("Mean APD Voltage (from Rigol, without trimming)")
+        return
+
+
 class PlotFitWorker(QRunnable):
     def __init__(self, current_folder, fig, xlabel, units, fit_mean, fit_std, roi_labels, keys_adjusted, rois_to_exclude=[]):
         """

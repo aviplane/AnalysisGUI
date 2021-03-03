@@ -85,6 +85,7 @@ class AnalysisGUI(QMainWindow, AnalysisUI):
     def set_date(self, date):
         self.date = date.toString(date_format_string)
         self.set_script_cb()
+        self.script_folder = ""
 
     def set_imaging_calibration(self):
         self.imaging_calibration = self.checkbox_imaging_calibration.isChecked()
@@ -411,6 +412,11 @@ class AnalysisGUI(QMainWindow, AnalysisUI):
         if len(fit_sum) > 5 and len(fit_sum) % 6 == 0:
             trap_values = np.mean(fit_sum, axis=0)
             compensation = trap_values[::-1] ** (-1 / 2)
+
+            # compensation[[17, 11, 5]] = 0
+
+            print(f"I am compensating with compensation = {compensation}")
+
             new_compensation = current_compensation * compensation
             new_compensation = new_compensation / \
                 np.linalg.norm(new_compensation)
