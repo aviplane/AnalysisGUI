@@ -71,7 +71,10 @@ def extract_rois(filepath):
 
 def extract_globals(filepath):
     with h5py.File(filepath, 'r') as hf:
-        variables = dict(hf.get('globals').attrs)
+        try:
+            variables = dict(hf.get('globals').attrs)
+        except AttributeError:
+            return {}
     return variables
 
 

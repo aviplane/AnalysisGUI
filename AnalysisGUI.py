@@ -76,7 +76,7 @@ class AnalysisGUI(QMainWindow, AnalysisUI):
         self.set_imaging_calibration()
         self.probe_threshold_value = 0
         self.amplitude_feedback = False
-        self.rm_client = Client(host='171.64.58.213')
+        self.rm_client = Client(host='171.64.56.36')
         self.threadpool = QThreadPool()
         self.parameters = ""
         self.f2_threshold = 0
@@ -542,8 +542,8 @@ class AnalysisGUI(QMainWindow, AnalysisUI):
         with open(current_folder + "/xlabel.txt", 'r') as xlabel_file:
             xlabel = xlabel_file.read().strip()
         sf, units = unitsDef(xlabel)
-        if xlabel != "PR_IntDuration" and xlabel != "OG_Duration":
-            return
+        # if xlabel != "PR_IntDuration" and xlabel != "OG_Duration":
+        #     return
         globals_list = np.load(current_folder + "/globals.npy",
                                allow_pickle=True)
         fits = np.load(current_folder + "/all_fits.npy")

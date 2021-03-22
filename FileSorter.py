@@ -277,7 +277,8 @@ class FileSorter(QThread):
         return scan_time
 
     def choose_xlabel(self, labels):
-        l = len(xlabels)
+        print(labels)
+        l = len(labels)
         if len(labels) == 1:
             #        if labels[0] == 'SP_RamseyPulsePhase':
             #            raman_ramsey = True
@@ -286,6 +287,8 @@ class FileSorter(QThread):
         elif len(labels) > 1:
             if 'Tweezer_RamseyPhase' in labels:
                 return labels[(labels.index('Tweezer_RamseyPhase') + 1) % l]
+            if 'Raman_RamseyPhase' in labels:
+                return labels[(labels.index('Raman_RamseyPhase') + 1) % l]
             if 'SP_RamseyPulsePhase' in labels:
                 return labels[(labels.index('SP_RamseyPulsePhase') + 1) % l]
             if 'SP_A_RamseyPulsePhase' in labels:
@@ -307,8 +310,8 @@ class FileSorter(QThread):
             main_string = 'OG_Duration'
             xlabel = "OG_Duration"
         else:
-            main_string = self.process_xlabel(xlabels[0])
-            xlabel = xlabels[0]
+            xlabel = self.choose_xlabel(xlabels)
+            main_string = self.process_xlabel(xlabel)
 
         if scan_globals["MeasurePairCreation"]:
             main_string = 'PairCreation_' + main_string
