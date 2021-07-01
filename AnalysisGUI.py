@@ -413,7 +413,7 @@ class AnalysisGUI(QMainWindow, AnalysisUI):
         fit_10 = fits[:, roi_labels.index('roi10')]
         fit_1m1 = fits[:, roi_labels.index('roi1-1')]
         fit_1p1 = fits[:, roi_labels.index('roi11')]
-        fit_sum = fit_10 + fit_1m1 + fit_1p1
+        fit_sum = fit_10  # + fit_1m1 + fit_1p1
         trap_values = np.mean(fit_sum, axis=0)
         assert n_traps == len(trap_values)
         # Reverse, since the frequency -> trap ordering is reversed
@@ -421,14 +421,15 @@ class AnalysisGUI(QMainWindow, AnalysisUI):
         if len(fit_sum) > 5 and len(fit_sum) % 6 == 0:
             trap_values = np.mean(fit_sum, axis=0)
             compensation = trap_values[::-1] ** (-1 / 2)
-
+            # compensation[0] = 0
+            # compensation[1] = 0
             # compensation[[17, 11, 5]] = 0
-
-            print(f"I am compensating with compensation = {compensation}")
 
             new_compensation = current_compensation * compensation
             new_compensation = new_compensation / \
                 np.linalg.norm(new_compensation)
+            print(f"compensation calculated: {compensation}")
+            print(f"New compensation = {new_compensation}")
             print(f"saving new compensation to {saved_path}")
             np.save(saved_path, new_compensation)
             print("Engaging new scan")

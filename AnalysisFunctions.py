@@ -17,11 +17,11 @@ import traceback
 state_sf = np.array([1, 1, 1])
 data_location = "S:\\Schleier Lab Dropbox\\Cavity Lab Data\\"
 
-bg_fp = "S:\\Schleier Lab Dropbox\\Cavity Lab Data\\2019\\2019-12\\2019-12-18\\2019-12-11-TweezerSpectrumCard\\background_1807"
+bg_fp = "A:\\Schleier Lab Dropbox\\Cavity Lab Data\\2019\\2019-12\\2019-12-18\\2019-12-11-TweezerSpectrumCard\\background_1807"
 rawim_bg = np.load(
-    f"{data_location}\\Cavity Lab Scripts\\cavity_analysis\\background.npy")
+    f"{data_location}Cavity Lab Scripts\\cavity_analysis\\background.npy")
 background_components = np.load(
-    f"{data_location}\\Cavity Lab Scripts\\cavity_analysis\\background_components_pca.npy")
+    f"{data_location}Cavity Lab Scripts\\cavity_analysis\\background_components_pca.npy")
 
 
 def get_complete_folder_path(apd, datafolder, data_date=str(date.today())):
@@ -64,7 +64,7 @@ def get_all_h5_files(script_folder, data_folder, data_date=str(date.today())):
 
 def extract_rois(filepath):
     with h5py.File(filepath, 'r') as hf:
-        rois = hf.get('data/rois').keys()
+        rois = list(sorted(hf.get('data/rois').keys()))
         data = np.array([hf.get('data/rois/{}'.format(roi)) for roi in rois])
         return list(rois), data
 

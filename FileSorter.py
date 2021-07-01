@@ -143,8 +143,10 @@ class FileSorter(QThread):
         print(file)
         roi_labels, rois = af.extract_rois(file)
         file_globals = af.extract_globals(file)
+        tweezer_freqs = file_globals["Tweezers_AOD1_Freqs"]
+        print(tweezer_freqs)
         fits = np.apply_along_axis(
-            trap_amplitudes, 1, rois, n_traps=self.get_global(file_globals, "Tweezers_AOD1_Number"))
+            trap_amplitudes_freqs, 1, rois, tweezer_freqs=tweezer_freqs)
         if self.imaging_calibration:
             print("Adjusting ROIs")
             fits = self.adjust_rois(fits, roi_labels)
@@ -162,10 +164,12 @@ class FileSorter(QThread):
                                            allow_pickle=True))
             physics_probe_list = list(np.load(current_folder + "/fzx_probe.npy",
                                               allow_pickle=True))
+            all_rois = np.load(current_folder + "/all_rois.npy")
             # rigol_probe_list = list(
             #     np.load(current_folder + "/rigol_probe.npy", allow_pickle=True))
             try:
                 all_fits = np.vstack([all_fits, np.array([fits])])
+                all_rois = np.vstack([all_rois, np.array([rois])])
             except ValueError:
                 print(f"Error with file: {file}")
                 traceback.print_exc()
@@ -182,6 +186,7 @@ class FileSorter(QThread):
             np.save(current_folder + "/globals.npy", globals_list)
             np.save(current_folder + "/xlabels.npy", xlabels)
             np.save(current_folder + "/all_fits.npy", all_fits)
+            np.save(current_folder + "/all_rois.npy", all_rois)
             np.save(current_folder + "/fzx_probe.npy", physics_probe_list)
             np.save(current_folder + "/bare_probe.npy", bare_probe_list)
             # np.save(current_folder + "/rigol_probe.npy", rigol_probe_list)
@@ -194,9 +199,11 @@ class FileSorter(QThread):
             np.save(current_folder + "/globals.npy", globals_list)
             np.save(current_folder + "/roi_labels.npy", roi_labels)
             np.save(current_folder + "/all_fits.npy", np.array([fits]))
+            np.save(current_folder + "/all_rois.npy", np.array([rois]))
             np.save(current_folder + "/xlabels.npy", np.array([xlabel_value]))
             np.save(current_folder + "/fzx_probe.npy", [physics_probe])
             np.save(current_folder + "/bare_probe.npy", [bare_probe])
+
 #            np.save(current_folder + "/rigol_probe_trace.npy",
 #                    [rigol_probe_trace])
             print("Creating fit files...")
@@ -266,7 +273,7 @@ class FileSorter(QThread):
     def get_global(self, file_globals, xlabel):
         xlabel_value = file_globals[xlabel]
         if hasattr(xlabel_value, '__iter__'):
-            return xlabel_value[0]
+            return xlabel_value[-1]
         return xlabel_value
 
     def process_xlabel(self, xlabel):

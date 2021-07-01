@@ -58,7 +58,7 @@ class Plot2DWorker(PlotFitWorker):
             n_rows, n_columns = 2, math.ceil(len(rois_to_plot) / 2)
             if len(self.keys_adjusted) < 2:
                 return
-            extent = [-0.5, self.fit_mean.shape[2] + 0.5,
+            extent = [-0.5, self.fit_mean.shape[2] - 0.5,
                       np.max(self.keys_adjusted) +
                       np.diff(self.keys_adjusted)[0],
                       np.min(self.keys_adjusted)]
@@ -184,6 +184,7 @@ class PlotCorrelationWorker(PlotFitWorker):
         if self.fit_mean.shape[0] < 2:
             return
         self.roi_labels = list(self.roi_labels)
+        self.fit_mean = self.fit_mean[..., :16]  # HARD CODED, this is bad
         fit_10 = self.fit_mean[:, self.roi_labels.index('roi10')]
         fit_1m1 = self.fit_mean[:, self.roi_labels.index('roi1-1')]
         fit_1p1 = self.fit_mean[:, self.roi_labels.index('roi11')]
