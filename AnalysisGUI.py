@@ -5,7 +5,6 @@ Created on Wed Aug 26 10:07:40 2020
 @author: Quantum Engineer
 """
 
-
 """
 Start Daemon
     Time stamp -> folder
@@ -17,13 +16,15 @@ Start Daemon
 """
 import sys
 sys.path.append("Z://")
-from runmanager.remote import Client
+#from runmanager.remote import Client
+import AnalysisFunctions
 
 import os
 import json
 import traceback
 import math
 import collections
+import importlib
 from units import unitsDef
 from FormattingStrings import *
 from plotformatting import *
@@ -39,7 +40,7 @@ from PyQt5 import QtCore
 from PyQt5.QtWidgets import *
 import numpy as np
 from PlotWorkers import Plot1DWorker, Plot2DWorker, Plot1DHistogramWorker, PlotPCAWorker, PlotCorrelationWorker
-
+import units
 # from AveragedPlots import *
 
 
@@ -76,7 +77,7 @@ class AnalysisGUI(QMainWindow, AnalysisUI):
         self.set_imaging_calibration()
         self.probe_threshold_value = 0
         self.amplitude_feedback = False
-        self.rm_client = Client(host='171.64.56.36')
+        # self.rm_client = Client(host='171.64.56.36')
         self.threadpool = QThreadPool()
         self.parameters = ""
         self.f2_threshold = 0
@@ -297,13 +298,21 @@ class AnalysisGUI(QMainWindow, AnalysisUI):
             # TODO: Error handling
 
     def make_plots(self, folder_to_plot):
+        import units
+        importlib.reload(units)
+        from units import unitsDef
         self.check_roi_boxes()
         self.folder_to_plot = folder_to_plot
         current_folder = f"{self.holding_folder}/{self.folder_to_plot}/"
         with open(current_folder + "/xlabel.txt", 'r') as xlabel_file:
             xlabel = xlabel_file.read().strip()
         sf, units = unitsDef(xlabel)
-        fits = np.load(current_folder + "/all_fits.npy")
+        fits = np.load(current_folder + "/all_rois.npy")
+        # TODO: Convert rois into integrated counts
+        fits = np.apply_along_axis(
+            AnalysisFunctions.get_trap_counts_from_roi, 2, fits)
+        fits = AnalysisFunctions.get_atom_number_from_fluorescence(fits)
+        print(f"Converted to atom number from fluorescence {fits.shape}")
         xlabels = np.load(current_folder + "/xlabels.npy")
         physics_probes = np.load(
             current_folder + "/fzx_probe.npy", allow_pickle=True)
@@ -333,10 +342,10 @@ class AnalysisGUI(QMainWindow, AnalysisUI):
         self.threadpool.start(plot1dworker)
         self.threadpool.start(plot2dworker)
 
-        if self.amplitude_feedback and 'reps' in folder_to_plot:
+        if self.amplitude_feedback and ('reps' in folder_to_plot or 'iteration' in folder_to_plot):
             n_traps = fit_mean.shape[-1]
             print(fit_mean.shape)
-            self.adjust_amplitude_compensation(n_traps)
+            self.adjust_amplitude_compensation(fit_mean, n_traps)
         self.make_probe_plot()
         if "PairCreation" in self.folder_to_plot and 'time' not in self.folder_to_plot:
             self.canvas_corr.setFixedHeight(600)
@@ -392,7 +401,7 @@ class AnalysisGUI(QMainWindow, AnalysisUI):
         mask = fit2 > self.f2_threshold
         return fits[mask], xlabels[mask]
 
-    def adjust_amplitude_compensation(self, n_traps):
+    def adjust_amplitude_compensation(self, fits, n_traps):
         """
         Look at the current atom uniformity, and update the relative trap powers
         to optimize uniformity.  This function engages with the runmanager remote
@@ -401,29 +410,30 @@ class AnalysisGUI(QMainWindow, AnalysisUI):
         Inputs: n_traps
         """
         current_folder = f"{self.holding_folder}/{self.folder_to_plot}/"
-        saved_path = compensation_path(n_traps)
-        print(f"Attempting to load from {saved_path}")
-        try:
-            current_compensation = np.load(saved_path)
-        except Exception as e:
-            print(e)
-            current_compensation = np.ones(n_traps)
-        fits = np.load(current_folder + "/all_fits.npy")
+        print("Amplitude Compensation")
+        #fits = np.load(current_folder + "/all_fits.npy")
         roi_labels = list(np.load(current_folder + "/roi_labels.npy"))
-        fit_10 = fits[:, roi_labels.index('roi10')]
-        fit_1m1 = fits[:, roi_labels.index('roi1-1')]
-        fit_1p1 = fits[:, roi_labels.index('roi11')]
-        fit_sum = fit_10  # + fit_1m1 + fit_1p1
+        fit_10 = fits[roi_labels.index('roi10')]
+        fit_1m1 = fits[roi_labels.index('roi1-1')]
+        fit_1p1 = fits[roi_labels.index('roi11')]
+        fit_sum = fit_10 + fit_1m1 + fit_1p1
+        print(fit_sum.shape)
         trap_values = np.mean(fit_sum, axis=0)
-        assert n_traps == len(trap_values)
+        assert n_traps == len(trap_values), f"{n_traps} {len(trap_values)}"
         # Reverse, since the frequency -> trap ordering is reversed
-        compensation = trap_values[::-1] ** (-1 / 3)
-        if len(fit_sum) > 5 and len(fit_sum) % 6 == 0:
+        if len(fit_sum) > 2 and len(fit_sum) % 4 == 0:
+            sites = [6, 10]
+            saved_path = compensation_path(len(sites))
+            print(f"Attempting to load from {saved_path}")
+            try:
+                current_compensation = np.load(saved_path)
+            except Exception as e:
+                print(e)
+                current_compensation = np.ones(n_traps)
             trap_values = np.mean(fit_sum, axis=0)
-            compensation = trap_values[::-1] ** (-1 / 2)
-            # compensation[0] = 0
-            # compensation[1] = 0
-            # compensation[[17, 11, 5]] = 0
+            # compensation = trap_values[::-1] ** (-1 / 3)
+            compensation = trap_values ** (-1 / 3)
+            compensation[np.delete(np.arange(n_traps), sites)] = 0
 
             new_compensation = current_compensation * compensation
             new_compensation = new_compensation / \
@@ -433,7 +443,7 @@ class AnalysisGUI(QMainWindow, AnalysisUI):
             print(f"saving new compensation to {saved_path}")
             np.save(saved_path, new_compensation)
             print("Engaging new scan")
-            self.rm_client.engage()
+            # self.rm_client.engage()
         return
 
     def make_probe_plot(self):

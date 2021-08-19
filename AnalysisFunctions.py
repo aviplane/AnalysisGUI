@@ -32,7 +32,7 @@ def get_complete_folder_path(apd, datafolder, data_date=str(date.today())):
 
 def get_holding_folder(apd, data_date=str(date.today())):
     fpd = data_location + data_date[0:4] + "\\" + \
-        data_date[0:7] + f"\\{data_date}\\{apd}"
+          data_date[0:7] + f"\\{data_date}\\{apd}"
     return fpd
 
 
@@ -171,8 +171,8 @@ def get_states(f):
         return ["All"]
     if not dokpuwaves and kpnum == 1:
         return ["F = 1", " F = 2"]
-#    if dokpuwaves and kpnum == 1: # EE
-#        return ["F = 1", " F = 2"]
+    #    if dokpuwaves and kpnum == 1: # EE
+    #        return ["F = 1", " F = 2"]
 
     def detuninglabel(detuning):
         if detuning == transitions:
@@ -184,7 +184,7 @@ def get_states(f):
         return "F = 2 or Other"
 
     imagingOrder = ["Remaining"] + \
-        [detuninglabel(i) for i in kpdetunings[:kpnum][::-1]]
+                   [detuninglabel(i) for i in kpdetunings[:kpnum][::-1]]
     return imagingOrder
 
 
@@ -197,7 +197,7 @@ def get_magnetization(rois, imagingOrder):
         index1m1 = imagingOrder.index('F = 1, -1')
     except:
         index1m1 = imagingOrder.index('Remaining')
-#    print(index1p1, index1m1)
+    #    print(index1p1, index1m1)
     magnetization = rois[index1p1] - rois[index1m1]
 
     return magnetization
@@ -279,8 +279,8 @@ def compute_rois_single_image(f, image):
     numStates = len(imagingOrder)
     rois = np.squeeze(rois)
     rois_2d = np.sum(rois, axis=1).astype('float')
-#    if "Magnetization" in imagingOrder:
-#        rois_2d[imagingOrder.index('Magnetization')]  = rois_2d[imagingOrder.index('Magnetization')]/rois_2d[imagingOrder.index('Sum')]
+    #    if "Magnetization" in imagingOrder:
+    #        rois_2d[imagingOrder.index('Magnetization')]  = rois_2d[imagingOrder.index('Magnetization')]/rois_2d[imagingOrder.index('Sum')]
 
     return rois_2d, imagingOrder
 
@@ -313,9 +313,9 @@ def choosexlabel(labels):
     raman_ramsey, usex = False, True
     if len(labels) == 1:
         raman_ramsey = False
-#        if labels[0] == 'SP_RamseyPulsePhase':
-#            raman_ramsey = True
-#            return 'run number'
+        #        if labels[0] == 'SP_RamseyPulsePhase':
+        #            raman_ramsey = True
+        #            return 'run number'
         return labels[0]
     elif len(labels) == 2:
         if 'Tweezer_RamseyPhase' in labels:
@@ -383,3 +383,36 @@ def get_xlabel_single_shot(path):
         units = [unitsDef(variable) for variable in variables]
         values = [rf.getxval2(path, variable) for variable in variables]
     return variables, values, units
+
+
+def get_trap_counts_from_roi(roi: np.ndarray, n_traps: int = 18, trap_width: float = 34,
+                             trap_start: float = 15) -> np.ndarray:
+    """
+    Return integrated trap counts for a ROI.  Given an input roi, and appropriate trap parameters specified in pixels,
+    return the integrated counts on the camera in each region.
+
+    :param roi:
+    :param n_traps:
+    :param trap_width:
+    :param trap_start:
+    :return: an array of length n_traps
+    """
+    trap_lines = trap_start + trap_width * np.arange(n_traps + 1)
+
+    def trap_signal(roi: np.ndarray, site):
+        return np.sum(roi[trap_lines[site]:trap_lines[site + 1]])
+
+    return np.array([trap_signal(roi, i) for i in np.arange(n_traps)])
+
+
+def get_atom_number_from_fluorescence(fluorescence):
+    """
+    Given an integrated fluorescence signal, return adjusted atom number, based on cavity shift/projection noise
+
+    :param fluorescence:
+    :return atom_number:
+    """
+
+    factor = 1/250
+    atom_number = fluorescence * factor
+    return atom_number

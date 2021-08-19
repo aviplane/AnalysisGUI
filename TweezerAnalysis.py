@@ -51,7 +51,10 @@ def make_guess(roi, n_traps):
 
 
 def make_guess_freqs(roi, tweezer_freqs: np.ndarray):
-    tweezer_spacing = np.abs(np.diff(tweezer_freqs)[0])
+    try:
+        tweezer_spacing = np.abs(np.diff(tweezer_freqs)[0])
+    except IndexError:
+        tweezer_spacing = 30
     n_traps = len(tweezer_freqs)
     first_trap = np.min(tweezer_freqs)
     first_trap_start = int(20 + 17.35 * (first_trap - 85.5))

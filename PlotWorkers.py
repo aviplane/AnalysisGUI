@@ -18,7 +18,7 @@ class ProbePlotWorker(QRunnable):
         """
         return
 
-    def run(self):
+    def run(self, rigol_probes, bare_probes, keys_adjusted):
         """
         """
         self.fig.clf()
@@ -68,7 +68,7 @@ class Plot2DWorker(PlotFitWorker):
                 cax = ax.imshow(self.fit_mean[i], aspect="auto",
                                 cmap=atom_cmap, extent=extent, vmin=0)
                 af.save_array(self.fit_mean[i], label, self.current_folder)
-                self.fig.colorbar(cax, ax=ax, label="Fitted counts")
+                self.fig.colorbar(cax, ax=ax, label="Atom Number")
                 if label in fancy_titles.keys():
                     ax.set_title(fancy_titles[label])
                 else:
@@ -91,6 +91,12 @@ class Plot1DWorker(PlotFitWorker):
             axis = self.fig.add_subplot(111)
             for state, state_std, label in zip(self.fit_mean, self.fit_std, self.roi_labels):
                 if label not in self.rois_to_exclude:
+                    # transparent_edge_plot(axis,
+                    #                       self.keys_adjusted,
+                    #                       state[:, 8],
+                    #                       state_std[:, 8],
+                    #                       label=fancy_titles[label])
+
                     transparent_edge_plot(axis,
                                           self.keys_adjusted,
                                           np.mean(state, axis=1),
@@ -103,7 +109,7 @@ class Plot1DWorker(PlotFitWorker):
             axis.axhline(self.f2_threshold, color='r',
                          linestyle='--', label="F = 2 Threshold")
             axis.legend()
-            axis.set_ylabel("Average trap counts")
+            axis.set_ylabel("Atoms")
             axis.set_xlabel(f"{self.xlabel} ({self.units})")
 
             af.save_figure(self.fig, "1d_plot", self.current_folder)
@@ -131,7 +137,7 @@ class Plot1DHistogramWorker(PlotFitWorker):
 
             axis.legend()
             axis.set_ylabel("Number of Shots")
-            axis.set_xlabel(f"Imaging Counts")
+            axis.set_xlabel(f"Atoms")
             af.save_figure(self.fig, "1d_histplot", self.current_folder)
         except:
             traceback.print_exc()

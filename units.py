@@ -19,6 +19,7 @@ def unitsDef(xlabel_name):
                   'MS_PhaseImprintDuration': 'us',
                   'MS_MWRabiDuration': 'us',
                   'MS_MWRamseyTime': 'us',
+                  'MS_TweezerSweepWaitTime': 'ms',
                   'MWR_SPSweepDuration': 'us',
                   'Raman_BigRamanDuration': 'us',
                   'RamanCooling_Duration': 'ms',
@@ -57,7 +58,7 @@ def unitsDef(xlabel_name):
     units_multiplier = {'us': 1e6,
                         'ms': 1e3,
                         'MHz': 1,
-                        'kHz': 1e3,
+                        'kHz': 1e-3,
                         'V': 1,
                         'deg': 1}
     if xlabel_name == 'ProbeCenterSweep':

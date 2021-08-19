@@ -56,7 +56,7 @@ class FileSorter(QThread):
                     self.folder_to_plot)
             else:
                 print("No Folders made yet")
-            QThread.sleep(1)
+            QThread.sleep(6)
         print("Thread ended")
 
     def stop(self):
@@ -151,7 +151,7 @@ class FileSorter(QThread):
             print("Adjusting ROIs")
             fits = self.adjust_rois(fits, roi_labels)
         physics_probe, bare_probe, alarm = self.get_cavity_transmission(file)
-        # rigol_probe_trace, rigol_probe_time = self.get_rigol_transmission(file)
+        rigol_probe_trace, rigol_probe_time = self.get_rigol_transmission(file)
         if "PairCreation_" in current_folder and alarm:
             print("Probe Out")
             # playsound("beep.mp3")
@@ -165,8 +165,7 @@ class FileSorter(QThread):
             physics_probe_list = list(np.load(current_folder + "/fzx_probe.npy",
                                               allow_pickle=True))
             all_rois = np.load(current_folder + "/all_rois.npy")
-            # rigol_probe_list = list(
-            #     np.load(current_folder + "/rigol_probe.npy", allow_pickle=True))
+            rigol_probe_list = list(np.load(current_folder + "/rigol_probe.npy", allow_pickle=True))
             try:
                 all_fits = np.vstack([all_fits, np.array([fits])])
                 all_rois = np.vstack([all_rois, np.array([rois])])
@@ -176,7 +175,7 @@ class FileSorter(QThread):
                 return
             bare_probe_list.append(bare_probe)
             physics_probe_list.append(physics_probe)
-            # rigol_probe_list.append(rigol_probe_trace)
+            rigol_probe_list.append(rigol_probe_trace)
             if xlabel == no_xlabel_string:
                 xlabel_value = np.max(xlabels) + 1
             else:
@@ -189,7 +188,7 @@ class FileSorter(QThread):
             np.save(current_folder + "/all_rois.npy", all_rois)
             np.save(current_folder + "/fzx_probe.npy", physics_probe_list)
             np.save(current_folder + "/bare_probe.npy", bare_probe_list)
-            # np.save(current_folder + "/rigol_probe.npy", rigol_probe_list)
+            np.save(current_folder + "/rigol_probe.npy", rigol_probe_list)
         except IOError:
             if xlabel == no_xlabel_string:
                 xlabel_value = 0
@@ -204,8 +203,8 @@ class FileSorter(QThread):
             np.save(current_folder + "/fzx_probe.npy", [physics_probe])
             np.save(current_folder + "/bare_probe.npy", [bare_probe])
 
-#            np.save(current_folder + "/rigol_probe_trace.npy",
-#                    [rigol_probe_trace])
+            np.save(current_folder + "/rigol_probe.npy",
+                    [rigol_probe_trace])
             print("Creating fit files...")
         return
 
