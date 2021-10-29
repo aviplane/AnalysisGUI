@@ -12,6 +12,12 @@ def unitsDef(xlabel_name):
                   'CK_TestuWaveSweepT': 'us',
                   'FI_Ixon_TweezerExpTime': 'us',
                   'FI_ImagCool_AM_Voltage': 'V',
+                  'KP_F2_KillTime': 'us',
+                  'KP_MWDurations': 'us',
+                  'Lattice_Imag_ShakingFrequency': 'kHz',
+                  'Lattice_Imag_ShakingDuration': 'ms',
+                  'Lattice_OffOffset':'us',
+                  'MS_CheckFieldWaitTime': 'us',
                   'MS_TweezerSweepDuration': 'ms',
                   'MS_SpectrumM4X_SweepDuration': 'ms',
                   'MS_KillSweepDuration': 'us',
@@ -19,7 +25,11 @@ def unitsDef(xlabel_name):
                   'MS_PhaseImprintDuration': 'us',
                   'MS_MWRabiDuration': 'us',
                   'MS_MWRamseyTime': 'us',
+                  'MS_SplitTimes': 'us',
+                  'MS_SplitWaitTime': 'us',
+                  'MS_SweepDuration':'ms',
                   'MS_TweezerSweepWaitTime': 'ms',
+                  'MS_TweezerRamseyTime':'us',
                   'MWR_SPSweepDuration': 'us',
                   'Raman_BigRamanDuration': 'us',
                   'RamanCooling_Duration': 'ms',
@@ -27,6 +37,7 @@ def unitsDef(xlabel_name):
                   'OG_Duration': 'us',
                   'PR_RampDuration': 'ms',
                   "PR_RampHoldTime": "ms",
+                  "PR_MaxDuration": "us",
                   "PR_ModulationFreqs": "kHz",
                   "PR_GradientPerSite": "kHz",
                   "PR_PulseFreq": "kHz",
@@ -40,6 +51,8 @@ def unitsDef(xlabel_name):
                   'Raman_SmallRamanPiHalf': 'us',
                   'Raman_SmallRamanGap': 'us',
                   'Raman_Offset': 'us',
+                  'Raman_BareFreq': 'MHz',
+                  'Raman_ModulationFreq': 'MHz',
                   'SP_PiPulseDuration': 'us',
                   'SP_BigRamanPiTime': 'us',
                   'SP_SpinEchoDuration': 'us',
@@ -50,10 +63,14 @@ def unitsDef(xlabel_name):
                   'Lattice_rampUpEarly': 'ms',
                   "Lattice_TrapRampDownDur": "ms",
                   'Tweezers_Imaging_RampUpDur': 'ms',
+                  'Tweezers_ImageSweepDuration': 'ms',
+                  'Tweezers_Imaging_HoldTime': 'ms',
                   'Tweezers_ModulationFreq': 'kHz',
                   'Tweezers_LatticeLoadOffset': 'ms',
                   'Tweezers_LatticeRampDownDur': 'ms',
-                  "Tweezers_LoopDuration": "us"
+                  "Tweezers_LoopDuration": "us",
+                  'Tweezers_Lattice_HoldTime': "ms",
+                  'Tweezers_HoldDuration': 'ms'
                   }
     units_multiplier = {'us': 1e6,
                         'ms': 1e3,
@@ -94,9 +111,6 @@ def unitsDef(xlabel_name):
     elif xlabel_name == 'MS_SpectrumM4X_PulseDuration':
         scale_factor = 1e6
         units = 'us'
-#    elif 'SpectrumM4X_SweepDuration' in xlabel_name:
-#        scale_factor = 1e6
-#        units = 'us'
     elif xlabel_name == 'MS_SpectrumM4X_Detuning':
         scale_factor = 1
         units = 'MHz'

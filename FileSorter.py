@@ -25,7 +25,7 @@ class FileSorter(QThread):
     def __init__(self, script_folder, date, imaging_calibration):
         super(FileSorter, self).__init__()
 
-        self.shot_threshold_size = 12e6
+        self.shot_threshold_size = 9e6
         self.script_folder = script_folder
         self.date = date
         self.holding_folder = af.get_holding_folder(
@@ -36,6 +36,7 @@ class FileSorter(QThread):
         self.imaging_calibration = imaging_calibration
         self.parameters = []
         self.delete_reps = False
+        self.list_index = 0
 
         try:
             with open(self.holding_folder + "/folder_dict.json", 'r') as dict_file:
@@ -111,7 +112,12 @@ class FileSorter(QThread):
             except Exception as e:
                 print(e)
                 traceback.print_exc()
-            move(file, new_location)
+            try:
+                move(file, new_location)
+            except Exception as e:
+                print(e)
+                traceback.print_exc()
+        print("Done sorting")
         return self.folder_to_plot
 
     def parameter_strings(self, file, parameters):
@@ -119,19 +125,23 @@ class FileSorter(QThread):
             return ''
         file_globals = af.extract_globals(file)
         factors, units = zip(*[unitsDef(param) for param in parameters])
-        parameter_strings = [f"{parameter.split('_')[-1]}{self.format_parameter(file_globals[parameter] * factor)}{unit}"
+        parameter_strings = [f"{parameter.split('_')[-1]}{self.format_parameter(file_globals[parameter], factor)}{unit}"
                              for parameter, unit, factor in zip(parameters, units, factors)
                              if parameter in file_globals]
 
         return '_'.join(parameter_strings)
 
-    def format_parameter(self, value):
-        if hasattr(value, '__iter__'):
-            value = np.round(value, 4)
-            return '-'.join(map(str, value))
-        else:
-            # not iterable
-            return f"{np.round(value, 4)}"
+    def format_parameter(self, v, factor):
+        try:
+            v = v * factor
+            if hasattr(value, '__iter__'):
+                value = np.round(value, 4)
+                return '-'.join(map(str, value))
+            else:
+                # not iterable
+                return f"{np.round(value, 4)}"
+        except: #probably a string, and we're lazy bc friyay
+            return v
         return
 
     def process_file(self, file, current_folder):
@@ -165,7 +175,8 @@ class FileSorter(QThread):
             physics_probe_list = list(np.load(current_folder + "/fzx_probe.npy",
                                               allow_pickle=True))
             all_rois = np.load(current_folder + "/all_rois.npy")
-            rigol_probe_list = list(np.load(current_folder + "/rigol_probe.npy", allow_pickle=True))
+            rigol_probe_list = list(
+                np.load(current_folder + "/rigol_probe.npy", allow_pickle=True))
             try:
                 all_fits = np.vstack([all_fits, np.array([fits])])
                 all_rois = np.vstack([all_rois, np.array([rois])])
@@ -272,7 +283,7 @@ class FileSorter(QThread):
     def get_global(self, file_globals, xlabel):
         xlabel_value = file_globals[xlabel]
         if hasattr(xlabel_value, '__iter__'):
-            return xlabel_value[-1]
+            return xlabel_value[max(self.list_index, len(xlabel_value) - 1)]
         return xlabel_value
 
     def process_xlabel(self, xlabel):
@@ -291,6 +302,10 @@ class FileSorter(QThread):
             #            return 'run number'
             return labels[0]
         elif len(labels) > 1:
+            if 'PR_WaitTime' in labels:
+                return 'PR_WaitTime'
+            if 'Tweezers_AOD0_LoadAmp' in labels:
+                return 'Tweezers_AOD0_LoadAmp'
             if 'Tweezer_RamseyPhase' in labels:
                 return labels[(labels.index('Tweezer_RamseyPhase') + 1) % l]
             if 'Raman_RamseyPhase' in labels:
@@ -299,6 +314,8 @@ class FileSorter(QThread):
                 return labels[(labels.index('SP_RamseyPulsePhase') + 1) % l]
             if 'SP_A_RamseyPulsePhase' in labels:
                 return labels[(labels.index('SP_A_RamseyPulsePhase') + 1) % l]
+            if 'Tweezers_Lattice_HoldTime' in labels:
+                return labels[(labels.index('Tweezers_Lattice_HoldTime') + 1) % l]
             if 'iteration' in labels:
                 return labels[(labels.index('iteration') + 1) % l]
             if 'waitMonitor' in labels:
@@ -326,7 +343,11 @@ class FileSorter(QThread):
         if scan_globals["CheckCavityShift"]:
             main_string = "cavity_shift"
             xlabel = "PR_DLProbe_Agilent_FlipFlopFreq"
-
+        try:
+            if scan_globals["CheckMagneticField"]:
+                main_string = b_field_check_string
+        except:
+            traceback.print_exc()
         main_string = f"{main_string}"
 
         return main_string, xlabel

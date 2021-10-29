@@ -16,7 +16,7 @@ Start Daemon
 """
 import sys
 sys.path.append("Z://")
-#from runmanager.remote import Client
+from runmanager.remote import Client
 import AnalysisFunctions
 
 import os
@@ -39,8 +39,15 @@ from PyQt5.QtCore import *
 from PyQt5 import QtCore
 from PyQt5.QtWidgets import *
 import numpy as np
-from PlotWorkers import Plot1DWorker, Plot2DWorker, Plot1DHistogramWorker, PlotPCAWorker, PlotCorrelationWorker
+from numpy import array
+from PlotWorkers import Plot1DWorker, Plot2DWorker, Plot1DHistogramWorker, PlotPCAWorker, PlotCorrelationWorker, PlotXYWorker
+import PlotWorkers
 import units
+import time
+import csv
+from datetime import datetime
+
+
 # from AveragedPlots import *
 
 
@@ -54,6 +61,7 @@ class AnalysisGUI(QMainWindow, AnalysisUI):
         self.cb_data.activated.connect(self.set_data_folder)
         self.picker_date.dateChanged.connect(self.set_date)
         self.parameters_lineedit.returnPressed.connect(self.set_parameters)
+        self.index_lineedit.returnPressed.connect(self.set_list_index)
         self.f2_threshold_input.returnPressed.connect(self.set_f2_threshold)
         self.f2_threshold_checkbox.stateChanged.connect(
             self.set_f2_threshold)
@@ -77,16 +85,20 @@ class AnalysisGUI(QMainWindow, AnalysisUI):
         self.set_imaging_calibration()
         self.probe_threshold_value = 0
         self.amplitude_feedback = False
-        # self.rm_client = Client(host='171.64.56.36')
+        self.rm_client = Client(host='171.64.56.36')
         self.threadpool = QThreadPool()
         self.parameters = ""
         self.f2_threshold = 0
+        self.list_index = 0
         self.ignore_first_shot = False
+        self.updated_folders = [] # BAD HACK BAD
+        self.plot_saver = PlotWorkers.PlotSaveWorker()
+        self.plot_saver.start()
 
     def set_date(self, date):
         self.date = date.toString(date_format_string)
         self.set_script_cb()
-        self.script_folder = ""
+        # self.script_folder = ""
 
     def set_imaging_calibration(self):
         self.imaging_calibration = self.checkbox_imaging_calibration.isChecked()
@@ -126,12 +138,15 @@ class AnalysisGUI(QMainWindow, AnalysisUI):
         return
 
     def set_script_cb(self):
+        self.cb_script.clear()
         try:
             folders = af.get_immediate_child_directories(
                 af.get_date_data_path(self.date))
             folders = [af.get_folder_base(i) for i in folders]
-            self.cb_script.clear()
             self.cb_script.addItems(folders)
+            if len(folders) > 0:
+                self.script_folder = folders[0]
+            self.set_script_folder(0)
         except FileNotFoundError:
             print("Selected bad date!")
 
@@ -152,14 +167,22 @@ class AnalysisGUI(QMainWindow, AnalysisUI):
         """
         Get list of folders
         """
+        self.cb_data.clear()
         try:
             folders = af.get_immediate_child_directories(self.holding_folder)
             folders = [af.get_folder_base(i) for i in folders]
-            self.cb_data.clear()
             self.cb_data.addItems(folders)
         except FileNotFoundError:
             print("Selected bad date, or bad folder?")
         return
+
+    def set_list_index(self):
+        try:
+            self.list_index = int(self.index_lineedit.text())
+        except:
+            self.list_index = 0
+        if self.worker:
+            self.worker.list_index = self.list_index
 
     def set_f2_threshold(self):
         try:
@@ -224,6 +247,7 @@ class AnalysisGUI(QMainWindow, AnalysisUI):
             self.worker.signal_output.folder_output_signal.connect(
                 self.make_plots)
             self.worker.start()
+            self.worker.list_index = self.list_index
             self.go_button.setText("Stop")
         elif self.go_button.text() == 'Stop':
             self.worker.stop()
@@ -232,7 +256,9 @@ class AnalysisGUI(QMainWindow, AnalysisUI):
 
     def stop_sorting(self):
         try:
+            self.worker.folder_to_plot = False
             self.worker.stop()
+            self.go_button.setText("Go")
             print("Stopping sorting thread...")
         except Exception as e:
             print(e)
@@ -322,9 +348,8 @@ class AnalysisGUI(QMainWindow, AnalysisUI):
             physics_probes = physics_probes[1:]
         fits, xlabels = self.select_probe_threshold(
             fits, xlabels, physics_probes)
-        # TODO: Add in F = 2 Thresholding
         roi_labels = np.load(current_folder + "/roi_labels.npy")
-        fits, xlabels = self.select_f2_threshold(fits, xlabels, roi_labels)
+#        fits, xlabels = self.select_f2_threshold(fits, xlabels, roi_labels)
         if len(fits) < 1:
             return
         fit_mean, fit_std, xlabels = self.group_shot(fits, xlabels)
@@ -339,40 +364,69 @@ class AnalysisGUI(QMainWindow, AnalysisUI):
         plot1dworker.f2_threshold = self.f2_threshold
         plot2dworker = Plot2DWorker(current_folder, self.figure_2d, xlabel, units,
                                     fit_mean, fit_std, roi_labels, keys_adjusted, rois_to_exclude=self.rois_to_exclude)
-        self.threadpool.start(plot1dworker)
-        self.threadpool.start(plot2dworker)
-
-        if self.amplitude_feedback and ('reps' in folder_to_plot or 'iteration' in folder_to_plot):
-            n_traps = fit_mean.shape[-1]
-            print(fit_mean.shape)
-            self.adjust_amplitude_compensation(fit_mean, n_traps)
-        self.make_probe_plot()
-        if "PairCreation" in self.folder_to_plot and 'time' not in self.folder_to_plot:
-            self.canvas_corr.setFixedHeight(600)
-            threshold_low = self.corr_threshold_min.value() / 100
-            threshold_high = self.corr_threshold_max.value() / 100
-            plotPCAworker = PlotPCAWorker(
-                current_folder, self.figure_phase, xlabel, units, fits, fit_std, roi_labels, keys_adjusted, rois_to_exclude=self.rois_to_exclude
-            )
-            plotCorrelationWorker = PlotCorrelationWorker(
-                current_folder, self.figure_corr, xlabel, units, fits, fit_std, roi_labels, keys_adjusted, rois_to_exclude=self.rois_to_exclude
-            )
-            plotCorrelationWorker.set_limits(threshold_low, threshold_high)
-            self.threadpool.start(plotPCAworker)
-            self.threadpool.start(plotCorrelationWorker)
-        elif "IntDuration" in self.folder_to_plot or "OG_Duration" in self.folder_to_plot or "SpinExchange" in self.folder_to_plot:
-            self.canvas_corr.setFixedHeight(600)
-            self.make_phase_plot()
-            self.make_magnetization_plot()
-        elif xlabel == no_xlabel_string:
-            self.canvas_corr.setFixedHeight(600)
-            plot1dhistworker = Plot1DHistogramWorker(
-                current_folder, self.figure_corr, xlabel, units,
-                fit_mean, fit_std, roi_labels, keys_adjusted, rois_to_exclude=self.rois_to_exclude)
-            self.threadpool.start(plot1dhistworker)
-        self.set_data_cb()
-        index = self.cb_data.findText(self.folder_to_plot)
-        self.cb_data.setCurrentIndex(index)
+        try:
+            self.threadpool.start(plot1dworker)
+            self.threadpool.start(plot2dworker)
+            if self.amplitude_feedback and ('reps' in folder_to_plot or 'iteration' in folder_to_plot):
+                n_traps = fit_mean.shape[-1]
+                print(fit_mean.shape)
+                self.adjust_amplitude_compensation(fit_mean, n_traps)
+            self.make_probe_plot()
+            if "PairCreation" in self.folder_to_plot and 'time' not in self.folder_to_plot:
+                self.canvas_corr.setFixedHeight(600)
+                threshold_low = self.corr_threshold_min.value() / 100
+                threshold_high = self.corr_threshold_max.value() / 100
+                plotPCAworker = PlotPCAWorker(
+                    current_folder, self.figure_phase, xlabel, units, fits, fit_std, roi_labels, keys_adjusted, rois_to_exclude=self.rois_to_exclude
+                )
+                plotCorrelationWorker = PlotCorrelationWorker(
+                    current_folder, self.figure_corr, xlabel, units, fits, fit_std, roi_labels, keys_adjusted, rois_to_exclude=self.rois_to_exclude
+                )
+                plotCorrelationWorker.set_limits(threshold_low, threshold_high)
+                plotCorrelationWorker.set_normalize(self.checkbox_normalize_correlations.isChecked())
+                plotXYWorker = PlotXYWorker(
+                    current_folder, self.figure_6, xlabel, units, fits, fit_std, roi_labels, keys_adjusted, rois_to_exclude=self.rois_to_exclude
+                )
+                self.threadpool.start(plotPCAworker)
+                self.threadpool.start(plotCorrelationWorker)
+                self.threadpool.start(plotXYWorker)
+            elif "IntDuration" in self.folder_to_plot or "OG_Duration" in self.folder_to_plot or "SpinExchange" in self.folder_to_plot or 'Raman_RamseyPhase':
+                self.canvas_corr.setFixedHeight(600)
+                try:
+                    self.make_phase_plot(sf, units)
+                except:
+                    "Error Making Phase Plot"
+                    traceback.print_exc()
+                self.make_magnetization_plot()
+            elif xlabel == no_xlabel_string:
+                self.canvas_corr.setFixedHeight(600)
+                plot1dhistworker = Plot1DHistogramWorker(
+                    current_folder, self.figure_corr, xlabel, units,
+                    fit_mean, fit_std, roi_labels, keys_adjusted, rois_to_exclude=self.rois_to_exclude)
+                self.threadpool.start(plot1dhistworker)
+            self.set_data_cb()
+            index = self.cb_data.findText(self.folder_to_plot)
+            self.cb_data.setCurrentIndex(index)
+        except:
+            traceback.print_exc()
+        try:
+            if b_field_check_string in self.folder_to_plot and self.folder_to_plot[-6:] not in self.updated_folders:
+                self.adjust_imaging_field(fit_mean, xlabels)
+        except:
+            traceback.print_exc()
+        current_date = QtCore.QDate.currentDate().toString(date_format_string)
+        print("Checked date")
+        ### if going and date is different, change date.
+        if current_date != self.date and self.go_button.text() == 'Stop':
+            self.stop_sorting()
+            time.sleep(40 * 60)
+            print("Adjusted date")
+            self.date = current_date
+            self.picker_date.setDate(QtCore.QDate.currentDate())
+            self.set_date(QtCore.QDate.currentDate())
+            print(self.script_folder)
+            self.make_sorter_thread()
+        print("done")
 
     def select_probe_threshold(self, fits, xlabels, physics_probes):
         if self.checkbox_probe_threhold.isChecked():
@@ -401,6 +455,45 @@ class AnalysisGUI(QMainWindow, AnalysisUI):
         mask = fit2 > self.f2_threshold
         return fits[mask], xlabels[mask]
 
+    def adjust_imaging_field(self, fits, xlabels):
+        current_folder = f"{self.holding_folder}/{self.folder_to_plot}/"
+        roi_labels = list(np.load(current_folder + "/roi_labels.npy"))
+        fit_10 = fits[roi_labels.index('roi10')]
+        fit_1m1 = fits[roi_labels.index('roi1-1')]
+        fit_1p1 = fits[roi_labels.index('roi11')]
+        fit_2 = fits[roi_labels.index('roi2orOther')]
+        if fit_2.shape[0] < 20:
+            return
+        pol = np.sum((fit_2 - fit_1m1), axis = 1)/np.sum((fit_2 + fit_1m1), axis = 1)
+        ### pol has shape n_shots X n_traps
+        print(pol, xlabels)
+        if np.mean(fit_2 + fit_1m1) < 100:
+            return
+        print("Adjusting B Field")
+        optimal_detuning = xlabels[np.argmax(pol)]
+        print(f"optimal_detuning: {optimal_detuning}")
+        globals = self.rm_client.get_globals(raw = True)
+        globals['CheckMagneticField'] = "False"
+        detuning_global = globals['MS_KPDetuning']
+        previous_detuning = eval(detuning_global)
+        new_freq = previous_detuning + optimal_detuning
+        new_freq_str = repr(new_freq)
+        new_globals = {'CheckMagneticField': 'False',
+                       'MS_KPDetuning': new_freq_str
+        }
+        with open(f'{self.holding_folder}/b_field.csv', 'a+') as f:
+            writer = csv.writer(f)
+            writer.writerow([datetime.now().strftime('%Y-%m-%d %H:%M:%S'), new_freq])
+
+        print(f"Set new detuning to {new_freq_str}")
+        globals['MS_KPDetuning'] = new_freq_str
+        self.updated_folders.append(self.folder_to_plot[-6:])
+        self.rm_client.set_globals(new_globals, raw = True)
+        print(self.updated_folders)
+        ### Get Current B Field with self.rm_client
+
+
+
     def adjust_amplitude_compensation(self, fits, n_traps):
         """
         Look at the current atom uniformity, and update the relative trap powers
@@ -422,7 +515,7 @@ class AnalysisGUI(QMainWindow, AnalysisUI):
         assert n_traps == len(trap_values), f"{n_traps} {len(trap_values)}"
         # Reverse, since the frequency -> trap ordering is reversed
         if len(fit_sum) > 2 and len(fit_sum) % 4 == 0:
-            sites = [6, 10]
+            sites = np.arange(4, 15, 2)  # [4, 8, 12, 16]
             saved_path = compensation_path(len(sites))
             print(f"Attempting to load from {saved_path}")
             try:
@@ -443,7 +536,7 @@ class AnalysisGUI(QMainWindow, AnalysisUI):
             print(f"saving new compensation to {saved_path}")
             np.save(saved_path, new_compensation)
             print("Engaging new scan")
-            # self.rm_client.engage()
+            self.rm_client.engage()
         return
 
     def make_probe_plot(self):
@@ -493,7 +586,9 @@ class AnalysisGUI(QMainWindow, AnalysisUI):
         ax.set_ylabel("Mean APD Voltage")
         ax.set_xlabel(f"{xlabel} ({units})")
         af.save_array(physics_means, "mean_probe_physics", current_folder)
-        af.save_figure(self.figure_probe, "probe", current_folder)
+        #af.save_figure(self.figure_probe, "probe", current_folder)
+        print("Putting Probe figure in queue")
+        PlotWorkers.file_save_queue.put((self.figure_probe, "probe", current_folder))
         self.canvas_probe.draw()
 
     def __mean_probe_value__(self, probe):
@@ -504,6 +599,7 @@ class AnalysisGUI(QMainWindow, AnalysisUI):
         return 0
 
     def __get_magnetization__(self, mean, roi_labels):
+        print(np.max(mean))
         mag = (
             (mean[:, roi_labels.index("roi11"), :]
              - mean[:, roi_labels.index("roi1-1"), :])
@@ -537,7 +633,7 @@ class AnalysisGUI(QMainWindow, AnalysisUI):
         if len(keys_adjusted) < 2:
             return
         pol = self.__get_magnetization__(fit_mean, roi_labels)
-        extent = [-0.5, fit_mean.shape[2] + 0.5,
+        extent = [-0.5, fit_mean.shape[2] - 0.5,
                   np.max(keys_adjusted) + np.diff(keys_adjusted)[0],
                   np.min(keys_adjusted)]
         cax = ax.imshow(
@@ -548,16 +644,21 @@ class AnalysisGUI(QMainWindow, AnalysisUI):
         af.save_figure(self.figure_corr, "magnetization", current_folder)
         self.canvas_corr.draw()
 
-    def make_phase_plot(self):
+    def make_phase_plot(self, sf, units):
         current_folder = f"{self.holding_folder}/{self.folder_to_plot}/"
         with open(current_folder + "/xlabel.txt", 'r') as xlabel_file:
             xlabel = xlabel_file.read().strip()
-        sf, units = unitsDef(xlabel)
+        # sf, units = unitsDef(xlabel)
         # if xlabel != "PR_IntDuration" and xlabel != "OG_Duration":
         #     return
         globals_list = np.load(current_folder + "/globals.npy",
                                allow_pickle=True)
-        fits = np.load(current_folder + "/all_fits.npy")
+        fits = np.load(current_folder + "/all_rois.npy")
+        print(np.max(fits))
+        fits = np.apply_along_axis(
+            AnalysisFunctions.get_trap_counts_from_roi, 2, fits)
+        fits = AnalysisFunctions.get_atom_number_from_fluorescence(fits)
+        print(np.max(fits))
         if len(fits) < 2:
             return
         roi_labels = list(np.load(current_folder + "/roi_labels.npy"))
@@ -568,24 +669,31 @@ class AnalysisGUI(QMainWindow, AnalysisUI):
             return
         fits_x, xlabels = self.sort_phase_list(phase_dict[0], xlabel)
         fits_y, _ = self.sort_phase_list(phase_dict[90], xlabel)
+        print(np.max(fits_x))
         if len(fits_x) != len(fits_y):
             print(f"Incompatible x/y lengths {len(fits_x)} and {len(fits_y)}")
             return
         keys_adjusted = np.array(xlabels) * sf
+        print(f"max x:{np.max(fits_x)}")
         x_pol = self.__get_magnetization__(fits_x, roi_labels)
         y_pol = self.__get_magnetization__(fits_y, roi_labels)
         n_traps = fits_x.shape[2]
         if len(keys_adjusted) < 2:
             return
-        extent = [-0.5, n_traps + 0.5, np.max(keys_adjusted) + np.diff(keys_adjusted)[0],
+        extent = [-0.5, n_traps - 0.5, np.max(keys_adjusted) + np.diff(keys_adjusted)[0],
                   np.min(keys_adjusted)]
         c_num = x_pol + 1j * y_pol
         if len(c_num) == 1:
             c_num = np.array([c_num])
         phase = np.angle(c_num)
         contrast = np.abs(c_num)
+        contrast[:, np.delete(np.arange(n_traps), [4, 8, 12, 16])] = 0
+        phase[:, np.delete(np.arange(n_traps), [4, 8, 12, 16])] = 0
+        print("Contrast", contrast.dtype)
+        print("phase", phase)
         self.save_array(phase, "phase", current_folder)
         self.save_array(contrast, "contrast", current_folder)
+        self.save_array(keys_adjusted, "keys_adjusted", current_folder)
         nrows, ncolumns = 2, 2
 
         self.figure_phase.clf()
@@ -595,7 +703,7 @@ class AnalysisGUI(QMainWindow, AnalysisUI):
         ax_phase.set_ylabel(f"{xlabel} ({units})")
         cax = ax_phase.imshow(
             phase, cmap=phase_colormap, aspect="auto", extent=extent,
-            vmin=-np.pi, vmax=np.pi)
+            vmin=-np.pi, vmax=np.pi, interpolation=None)
         self.figure_phase.colorbar(cax)
 
         ax_contrast = self.figure_phase.add_subplot(nrows, ncolumns, 2)
@@ -603,7 +711,7 @@ class AnalysisGUI(QMainWindow, AnalysisUI):
         ax_contrast.set_title("Contrast")
         ax_contrast.set_ylabel(f"{xlabel} ({units})")
         cax = ax_contrast.imshow(contrast, cmap=contrast_colormap, aspect="auto", extent=extent,
-                                 vmin=0, vmax=1)
+                                 vmin=0, vmax=1, interpolation=None)
         self.figure_phase.colorbar(cax, ax=ax_contrast)
 
         ax_x = self.figure_phase.add_subplot(nrows, ncolumns, 3)

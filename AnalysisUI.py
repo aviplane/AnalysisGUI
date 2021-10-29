@@ -53,6 +53,11 @@ class AnalysisUI:
         self.parameters_label = QLabel(f"Parameters: ")
         self.parameters_lineedit = QLineEdit()
 
+        self.index_label = QLabel(f"Index: ")
+        self.index_lineedit = QLineEdit()
+
+        self.sites_label = QLabel(f"Sites: ")
+
         self.rois_selection = []
 
         n_columns = 12
@@ -88,15 +93,21 @@ class AnalysisUI:
         self.set_roi_selector(row_num)
         row_num += 1
         # Add in parameter field
+        self.parameter_selector_layout = QHBoxLayout()
         self.grid_layout.addWidget(self.parameters_label, row_num, 0, 1, 1)
         self.grid_layout.addWidget(self.parameters_lineedit, row_num, 1, 1, 2)
 
         row_num += 1
         self.f2_threshold_checkbox = QCheckBox("F = 2 Thresholding")
         self.f2_threshold_input = QLineEdit("")
+        self.checkbox_normalize_correlations = QCheckBox("Normalize Correlation")
+
         self.threshold_layout = QHBoxLayout()
         self.threshold_layout.addWidget(self.f2_threshold_checkbox)
         self.threshold_layout.addWidget(self.f2_threshold_input)
+        self.threshold_layout.addWidget(self.index_label)
+        self.threshold_layout.addWidget(self.index_lineedit)
+        self.threshold_layout.addWidget(self.checkbox_normalize_correlations)
         self.grid_layout.addLayout(
             self.threshold_layout, row_num, 0, 1, self.n_columns)
         row_num = row_num + 1

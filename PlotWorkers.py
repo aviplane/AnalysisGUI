@@ -10,7 +10,33 @@ import math
 from colorcet import cm
 from sklearn.decomposition import PCA
 from scipy.stats import norm
+import time
+import queue
 
+file_save_queue = queue.Queue()
+
+class PlotSaveWorker(QThread):
+    def __init__(self):
+
+        super(PlotSaveWorker, self).__init__()
+
+        self.running = True
+        return
+
+    def run(self):
+        while self.running:
+            while file_save_queue.qsize() > 0:
+                fig, fname, folder = file_save_queue.get()
+                print(fname, folder)
+                af.save_figure(fig, fname, folder)
+                QThread.sleep(0.1)
+            QThread.sleep(3)
+
+    def stop(self):
+        self.running = False
+        if self.folder_to_plot:
+            self.signal_output.folder_output_signal.emit(self.folder_to_plot)
+        self.terminate()
 
 class ProbePlotWorker(QRunnable):
     def __init__(self, current_folder, fig, xlabel, units, keys_adjusted, bare_probes, rigol_probes):
@@ -75,7 +101,9 @@ class Plot2DWorker(PlotFitWorker):
                     ax.set_title(label)
                 ax.set_xlabel("Trap Index")
                 ax.set_ylabel(f"{self.xlabel} ({self.units})")
-            af.save_figure(self.fig, "2d_plot", self.current_folder)
+            print("Putting 2D Figure in queue")
+            file_save_queue.put((self.fig, '2d_plot', self.current_folder))
+            print("Saved figure")
         except:
             traceback.print_exc()
 
@@ -84,9 +112,9 @@ class Plot1DWorker(PlotFitWorker):
     """
     Worker Thread to make 1D plot
     """
-
     def run(self):
         try:
+            print("Making 1D Plot")
             self.fig.clf()
             axis = self.fig.add_subplot(111)
             for state, state_std, label in zip(self.fit_mean, self.fit_std, self.roi_labels):
@@ -111,9 +139,8 @@ class Plot1DWorker(PlotFitWorker):
             axis.legend()
             axis.set_ylabel("Atoms")
             axis.set_xlabel(f"{self.xlabel} ({self.units})")
-
-            af.save_figure(self.fig, "1d_plot", self.current_folder)
-
+            print("Putting 1D Figure in queue")
+            file_save_queue.put((self.fig, '1d_plot', self.current_folder))
         except:
             traceback.print_exc()
 
@@ -138,7 +165,8 @@ class Plot1DHistogramWorker(PlotFitWorker):
             axis.legend()
             axis.set_ylabel("Number of Shots")
             axis.set_xlabel(f"Atoms")
-            af.save_figure(self.fig, "1d_histplot", self.current_folder)
+            print("Putting 1D histplot in queue")
+            file_save_queue.put((self.fig, '1d_histplot', self.current_folder))
         except:
             traceback.print_exc()
 
@@ -146,6 +174,7 @@ class Plot1DHistogramWorker(PlotFitWorker):
 class PlotPCAWorker(PlotFitWorker):
     def run(self):
         print(self.fit_mean.shape)
+        self.fit_mean = self.fit_mean[..., [4, 6, 8, 10, 12, 14]]  # HARD CODED, this is bad
         if self.fit_mean.shape[0] < 8:
             return
         n_traps = self.fit_mean.shape[2]
@@ -156,7 +185,7 @@ class PlotPCAWorker(PlotFitWorker):
         fit_sum = (fit_1m1 + fit_1p1 + fit_10)
         fit_1m1, fit_1p1 = fit_1m1 / fit_sum, fit_1p1 / fit_sum
 
-        fit_side_mode = np.hstack([fit_1m1, fit_1p1])
+        fit_side_mode = fit_1p1 - fit_1m1
         n_components = 5
         side_mode_pca = PCA(n_components=n_components)
         side_mode_pca.fit(fit_side_mode)
@@ -168,20 +197,56 @@ class PlotPCAWorker(PlotFitWorker):
         ax_num = 1
         for component, variance in zip(components, variance_explanation):
             ax = self.fig.add_subplot(n_components, 1, ax_num)
-            c = [component[:n_traps], component[n_traps:]]
+
+            c = component
             mag = np.max(np.abs(c))
-            cax = ax.imshow(c, cmap=cm.coolwarm, vmin=-mag, vmax=mag)
-            ax.set_yticks([0, 1])
-            ax.set_yticklabels(["1, -1", "1, 1"])
+            cax = ax.imshow([c], cmap=cm.coolwarm, vmin=-mag, vmax=mag)
+            ax.set_yticks([0.5])
+            ax.set_yticklabels([""])
             ax.set_title(f"Variance explained: {variance * 100:.1f}%")
             self.fig.colorbar(cax, ax=ax)
             ax.set_xlabel("Trap Index")
             ax_num += 1
+        file_save_queue.put((self.fig, 'pc_pca_components', self.current_folder))
 
-        af.save_figure(self.fig, "pc_pca_copmonents", self.current_folder)
+        #af.save_figure(self.fig, "pc_pca_copmonents", self.current_folder)
 
+class PlotXYWorker(PlotFitWorker):
+    def run(self):
+        self.fit_mean = self.fit_mean[..., [4, 6, 8, 10, 12, 14]]  # HARD CODED, this is bad
+        if self.fit_mean.shape[0] < 8:
+            return
+        n_traps = self.fit_mean.shape[2]
+        self.roi_labels = list(self.roi_labels)
+        fit_1m1 = self.fit_mean[:, self.roi_labels.index('roi1-1')]  # fit_sum
+        fit_1p1 = self.fit_mean[:, self.roi_labels.index('roi11')]  # fit_sum
+        fit_10 = self.fit_mean[:, self.roi_labels.index('roi10')]
+        fit_sum = (fit_1m1 + fit_1p1 + fit_10)
+        fit_1m1, fit_1p1 = fit_1m1 / fit_sum, fit_1p1 / fit_sum
+
+        pol = fit_1p1 - fit_1m1
+        # shots X sites
+        c_nums = pol[:, ::2] + 1j * pol[:, 1::2]
+        # shots X sites/2
+        mags = np.abs(c_nums)
+        phases = np.angle(c_nums)
+        print("XY: ", phases.shape)
+        phases = phases - phases[:, 0, np.newaxis]
+        print("XY: ", phases.shape)
+        adj_cnum = mags * np.exp(1j * phases)
+        x = np.real(adj_cnum)
+        y = np.imag(adj_cnum)
+        self.fig.clf()
+        ax = (self.fig.add_subplot(1, 1, 1))
+        colors = ["tab:blue", "tab:green", "tab:red"]
+        for e, (x_i, y_i) in enumerate(zip(x.T, y.T)):
+            ax.scatter(x_i, y_i, color = colors[e], alpha = 0.7, )
+        file_save_queue.put((self.fig, 'pc_xy_plot', self.current_folder))
 
 class PlotCorrelationWorker(PlotFitWorker):
+    def set_normalize(self, normalize):
+        self.normalize = normalize
+
     def set_limits(self, correlation_low, correlation_high):
         self.threshold_low = correlation_low
         self.threshold_high = correlation_high
@@ -190,7 +255,7 @@ class PlotCorrelationWorker(PlotFitWorker):
         if self.fit_mean.shape[0] < 2:
             return
         self.roi_labels = list(self.roi_labels)
-        self.fit_mean = self.fit_mean[..., :16]  # HARD CODED, this is bad
+        self.fit_mean = self.fit_mean[...,  [4, 6, 8, 10, 12, 14]]  # HARD CODED, this is bad
         fit_10 = self.fit_mean[:, self.roi_labels.index('roi10')]
         fit_1m1 = self.fit_mean[:, self.roi_labels.index('roi1-1')]
         fit_1p1 = self.fit_mean[:, self.roi_labels.index('roi11')]
@@ -215,7 +280,11 @@ class PlotCorrelationWorker(PlotFitWorker):
             (fit_1m1 / fit_sum).T,
             (fit_1p1 / fit_sum).T)[:n_traps, n_traps:]
         pol = (fit_1p1 - fit_1m1) / fit_sum
-        corr_sidemode = np.cov(pol, rowvar=False)
+        if self.normalize:
+            corr_sidemode = np.corrcoef(pol, rowvar = False)
+        else:
+            corr_sidemode = np.cov(pol, rowvar=False)
+
         self.fig.clf()
         axes = (self.fig.add_subplot(2, 2, 1),
                 self.fig.add_subplot(2, 2, 2),
@@ -244,7 +313,7 @@ class PlotCorrelationWorker(PlotFitWorker):
             cmap=correlation_colormap)
         axes[1].set_xlabel("1, -1 trap index")
         axes[1].set_ylabel("1, 1 trap index")
-        axes[1].set_title("Polarization Covariance (Not normalized)")
+        axes[1].set_title(f"Polarization Covariance ({'' if self.normalize else 'not '}normalized)")
         self.fig.colorbar(cax, ax=axes[1])
         af.save_array(corr_sidemode, "pol_cov", self.current_folder)
         positions = list(range(-n_traps + 1, n_traps))
@@ -265,4 +334,6 @@ class PlotCorrelationWorker(PlotFitWorker):
                       self.current_folder)
         axes[2].set_title("Total atom number normalization")
         axes[3].set_title("Sidemode normalization")
-        af.save_figure(self.fig, "correlations", self.current_folder)
+        file_save_queue.put((self.fig, 'correlations', self.current_folder))
+
+#        af.save_figure(self.fig, "correlations", self.current_folder)
