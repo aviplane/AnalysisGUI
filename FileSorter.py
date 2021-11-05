@@ -160,7 +160,7 @@ class FileSorter(QThread):
         if self.imaging_calibration:
             print("Adjusting ROIs")
             fits = self.adjust_rois(fits, roi_labels)
-        physics_probe, bare_probe, alarm = self.get_cavity_transmission(file)
+        physics_probe, bare_probe, bare_input, alarm = self.get_cavity_transmission(file)
         rigol_probe_trace, rigol_probe_time = self.get_rigol_transmission(file)
         if "PairCreation_" in current_folder and alarm:
             print("Probe Out")
@@ -171,6 +171,8 @@ class FileSorter(QThread):
             globals_list = np.load(current_folder + "/globals.npy",
                                    allow_pickle=True)
             bare_probe_list = list(np.load(current_folder + "/bare_probe.npy",
+                                           allow_pickle=True))
+            bare_input_list = list(np.load(current_folder + "/bare_input.npy",
                                            allow_pickle=True))
             physics_probe_list = list(np.load(current_folder + "/fzx_probe.npy",
                                               allow_pickle=True))
@@ -185,6 +187,7 @@ class FileSorter(QThread):
                 traceback.print_exc()
                 return
             bare_probe_list.append(bare_probe)
+            bare_input_list.append(bare_input)
             physics_probe_list.append(physics_probe)
             rigol_probe_list.append(rigol_probe_trace)
             if xlabel == no_xlabel_string:
@@ -199,6 +202,7 @@ class FileSorter(QThread):
             np.save(current_folder + "/all_rois.npy", all_rois)
             np.save(current_folder + "/fzx_probe.npy", physics_probe_list)
             np.save(current_folder + "/bare_probe.npy", bare_probe_list)
+            np.save(current_folder + "/bare_input.npy", bare_input_list)
             np.save(current_folder + "/rigol_probe.npy", rigol_probe_list)
         except IOError:
             if xlabel == no_xlabel_string:
@@ -213,7 +217,7 @@ class FileSorter(QThread):
             np.save(current_folder + "/xlabels.npy", np.array([xlabel_value]))
             np.save(current_folder + "/fzx_probe.npy", [physics_probe])
             np.save(current_folder + "/bare_probe.npy", [bare_probe])
-
+            np.save(current_folder + "/bare_input.npy", [bare_input])
             np.save(current_folder + "/rigol_probe.npy",
                     [rigol_probe_trace])
             print("Creating fit files...")
@@ -222,19 +226,26 @@ class FileSorter(QThread):
     def get_cavity_transmission(self, file):
         try:
             bare_probe = rf.getdata(file, "GreyCavityTransmissionBare")
+        except Exception as e:
+            bare_probe = [(0, 0), (1, 0)]
+            traceback.print_exc()
+        try:
             physics_probe = rf.getdata(file, "GreyCavityTransmissionProbe")
         except Exception as e:
-            print(e)
             physics_probe = [(0, 0), (1, 0)]
-            bare_probe = [(0, 0), (1, 0)]
             """
             TODO: Error Handling
             """
+        try:
+            probe_input = rf.getdata(file, "InputCavityTransmissionBare")
+        except Exception as e:
+            probe_input = [(0,0), (1, 0)]
+
         bare_probe_processed = self.__process_trace__(bare_probe)
         alarm = False
         if np.max(bare_probe_processed) < 4 * np.min(bare_probe_processed):
             alarm = True
-        return self.__process_trace__(physics_probe), bare_probe_processed, alarm
+        return self.__process_trace__(physics_probe), bare_probe_processed, self.__process_trace__(probe_input), alarm
 
     def get_rigol_transmission(self, file, h5_string="ProbeRigolTrace"):
         """

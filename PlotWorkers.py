@@ -27,7 +27,6 @@ class PlotSaveWorker(QThread):
         while self.running:
             while file_save_queue.qsize() > 0:
                 fig, fname, folder = file_save_queue.get()
-                print(fname, folder)
                 af.save_figure(fig, fname, folder)
                 QThread.sleep(0.1)
             QThread.sleep(3)
@@ -101,9 +100,7 @@ class Plot2DWorker(PlotFitWorker):
                     ax.set_title(label)
                 ax.set_xlabel("Trap Index")
                 ax.set_ylabel(f"{self.xlabel} ({self.units})")
-            print("Putting 2D Figure in queue")
             file_save_queue.put((self.fig, '2d_plot', self.current_folder))
-            print("Saved figure")
         except:
             traceback.print_exc()
 
@@ -114,7 +111,6 @@ class Plot1DWorker(PlotFitWorker):
     """
     def run(self):
         try:
-            print("Making 1D Plot")
             self.fig.clf()
             axis = self.fig.add_subplot(111)
             for state, state_std, label in zip(self.fit_mean, self.fit_std, self.roi_labels):
@@ -139,7 +135,6 @@ class Plot1DWorker(PlotFitWorker):
             axis.legend()
             axis.set_ylabel("Atoms")
             axis.set_xlabel(f"{self.xlabel} ({self.units})")
-            print("Putting 1D Figure in queue")
             file_save_queue.put((self.fig, '1d_plot', self.current_folder))
         except:
             traceback.print_exc()
@@ -165,7 +160,6 @@ class Plot1DHistogramWorker(PlotFitWorker):
             axis.legend()
             axis.set_ylabel("Number of Shots")
             axis.set_xlabel(f"Atoms")
-            print("Putting 1D histplot in queue")
             file_save_queue.put((self.fig, '1d_histplot', self.current_folder))
         except:
             traceback.print_exc()
@@ -173,7 +167,6 @@ class Plot1DHistogramWorker(PlotFitWorker):
 
 class PlotPCAWorker(PlotFitWorker):
     def run(self):
-        print(self.fit_mean.shape)
         self.fit_mean = self.fit_mean[..., [4, 6, 8, 10, 12, 14]]  # HARD CODED, this is bad
         if self.fit_mean.shape[0] < 8:
             return
@@ -230,9 +223,7 @@ class PlotXYWorker(PlotFitWorker):
         # shots X sites/2
         mags = np.abs(c_nums)
         phases = np.angle(c_nums)
-        print("XY: ", phases.shape)
         phases = phases - phases[:, 0, np.newaxis]
-        print("XY: ", phases.shape)
         adj_cnum = mags * np.exp(1j * phases)
         x = np.real(adj_cnum)
         y = np.imag(adj_cnum)
@@ -265,7 +256,6 @@ class PlotCorrelationWorker(PlotFitWorker):
             axis=1
         )
 
-        print(sidemode, sidemode.shape)
         threshold_index = np.where((sidemode >= self.threshold_low) &
                                    (sidemode < self.threshold_high))
 

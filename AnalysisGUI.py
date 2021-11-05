@@ -46,8 +46,9 @@ import units
 import time
 import csv
 from datetime import datetime
-
-
+from fit_functions import lorentzian
+from scipy.optimize import curve_fit
+pi = np.pi
 # from AveragedPlots import *
 
 
@@ -74,6 +75,9 @@ class AnalysisGUI(QMainWindow, AnalysisUI):
         self.checkbox_ignore_first_shot.stateChanged.connect(
             self.set_ignore_first_shot
         )
+        self.checkbox_adjust_probe.stateChanged.connect(
+            self.set_adjust_probe
+        )
         self.corr_threshold_min.sliderReleased.connect(self.set_corr_threshold)
         self.corr_threshold_max.sliderReleased.connect(self.set_corr_threshold)
         self.probe_threshold.sliderReleased.connect(self.set_probe_threshold)
@@ -85,6 +89,7 @@ class AnalysisGUI(QMainWindow, AnalysisUI):
         self.set_imaging_calibration()
         self.probe_threshold_value = 0
         self.amplitude_feedback = False
+        self.adjust_probe = False
         self.rm_client = Client(host='171.64.56.36')
         self.threadpool = QThreadPool()
         self.parameters = ""
@@ -135,6 +140,10 @@ class AnalysisGUI(QMainWindow, AnalysisUI):
 
     def set_amplitude_feedback(self):
         self.amplitude_feedback = self.checkbox_adjust_amplitudes.isChecked()
+        return
+
+    def set_adjust_probe(self):
+        self.adjust_probe = self.checkbox_adjust_probe.isChecked()
         return
 
     def set_script_cb(self):
@@ -230,7 +239,6 @@ class AnalysisGUI(QMainWindow, AnalysisUI):
 
     def set_data_folder(self):
         folder_to_plot = self.cb_data.currentText()
-        print(folder_to_plot)
         try:
             if not self.worker.running and folder_to_plot != "":
                 self.make_plots(folder_to_plot)
@@ -323,7 +331,35 @@ class AnalysisGUI(QMainWindow, AnalysisUI):
             print("Problem saving")
             # TODO: Error handling
 
+
+    def __seconds_since_midnight__(self) -> float:
+        """
+        How many seconds has it been since midnight on the same day?
+
+        :returns seconds since midnight: float
+        """
+        now = datetime.now()
+        seconds_since_midnight = (now - now.replace(hour=0, minute=0, second=0, microsecond=0)).total_seconds()
+        return seconds_since_midnight
+
+    def update_date(self):
+        """
+        Update the date if it changed
+        """
+        current_date = QtCore.QDate.currentDate().toString(date_format_string)
+        if current_date != self.date and self.go_button.text() == 'Stop':
+            time.sleep(60 * 40)
+            self.stop_sorting()
+            self.date = current_date
+            self.picker_date.setDate(QtCore.QDate.currentDate())
+            self.set_date(QtCore.QDate.currentDate())
+            self.make_sorter_thread()
+        return
+
     def make_plots(self, folder_to_plot):
+        """
+        Make all the plots for some particular folder.
+        """
         import units
         importlib.reload(units)
         from units import unitsDef
@@ -388,7 +424,7 @@ class AnalysisGUI(QMainWindow, AnalysisUI):
                     current_folder, self.figure_6, xlabel, units, fits, fit_std, roi_labels, keys_adjusted, rois_to_exclude=self.rois_to_exclude
                 )
                 self.threadpool.start(plotPCAworker)
-                self.threadpool.start(plotCorrelationWorker)
+                #self.threadpool.start(plotCorrelationWorker)
                 self.threadpool.start(plotXYWorker)
             elif "IntDuration" in self.folder_to_plot or "OG_Duration" in self.folder_to_plot or "SpinExchange" in self.folder_to_plot or 'Raman_RamseyPhase':
                 self.canvas_corr.setFixedHeight(600)
@@ -411,22 +447,27 @@ class AnalysisGUI(QMainWindow, AnalysisUI):
             traceback.print_exc()
         try:
             if b_field_check_string in self.folder_to_plot and self.folder_to_plot[-6:] not in self.updated_folders:
-                self.adjust_imaging_field(fit_mean, xlabels)
+                if xlabel == "MS_CheckFieldDetuning":
+                    self.adjust_imaging_field(fit_mean, xlabels)
+                elif xlabel == 'iteration':
+                    self.adjust_imaging_field_ramsey(fit_mean, xlabels)
         except:
             traceback.print_exc()
+
+        if self.adjust_probe:
+            try:
+                self.adjust_probe_values()
+            except:
+                traceback.print_exc()
+
         current_date = QtCore.QDate.currentDate().toString(date_format_string)
-        print("Checked date")
-        ### if going and date is different, change date.
         if current_date != self.date and self.go_button.text() == 'Stop':
+            time.sleep(60 * 40)
             self.stop_sorting()
-            time.sleep(40 * 60)
-            print("Adjusted date")
             self.date = current_date
             self.picker_date.setDate(QtCore.QDate.currentDate())
             self.set_date(QtCore.QDate.currentDate())
-            print(self.script_folder)
             self.make_sorter_thread()
-        print("done")
 
     def select_probe_threshold(self, fits, xlabels, physics_probes):
         if self.checkbox_probe_threhold.isChecked():
@@ -456,18 +497,23 @@ class AnalysisGUI(QMainWindow, AnalysisUI):
         return fits[mask], xlabels[mask]
 
     def adjust_imaging_field(self, fits, xlabels):
+        """
+        Adjust the frequencies of the magnetic fields to accound for slow drifts
+        in the magnetic field during the imaging portion of the sequence.
+        """
         current_folder = f"{self.holding_folder}/{self.folder_to_plot}/"
         roi_labels = list(np.load(current_folder + "/roi_labels.npy"))
         fit_10 = fits[roi_labels.index('roi10')]
         fit_1m1 = fits[roi_labels.index('roi1-1')]
         fit_1p1 = fits[roi_labels.index('roi11')]
         fit_2 = fits[roi_labels.index('roi2orOther')]
-        if fit_2.shape[0] < 20:
+        if fit_2.shape[0] < 19:
             return
+        fit_2 = fit_2[:, [8]]
+        fit_1m1 = fit_1m1[:, [8]]
         pol = np.sum((fit_2 - fit_1m1), axis = 1)/np.sum((fit_2 + fit_1m1), axis = 1)
         ### pol has shape n_shots X n_traps
-        print(pol, xlabels)
-        if np.mean(fit_2 + fit_1m1) < 100:
+        if np.mean(fit_2 + fit_1m1) < 200:
             return
         print("Adjusting B Field")
         optimal_detuning = xlabels[np.argmax(pol)]
@@ -485,14 +531,89 @@ class AnalysisGUI(QMainWindow, AnalysisUI):
             writer = csv.writer(f)
             writer.writerow([datetime.now().strftime('%Y-%m-%d %H:%M:%S'), new_freq])
 
-        print(f"Set new detuning to {new_freq_str}")
         globals['MS_KPDetuning'] = new_freq_str
         self.updated_folders.append(self.folder_to_plot[-6:])
         self.rm_client.set_globals(new_globals, raw = True)
-        print(self.updated_folders)
         ### Get Current B Field with self.rm_client
 
+    def adjust_imaging_field_ramsey(self, fits, xlabels, n_shots = 4):
+        current_folder = f"{self.holding_folder}/{self.folder_to_plot}/"
+        roi_labels = list(np.load(current_folder + "/roi_labels.npy"))
+        fit_10 = fits[roi_labels.index('roi10')]
+        fit_1m1 = fits[roi_labels.index('roi1-1')]
+        fit_1p1 = fits[roi_labels.index('roi11')]
+        fit_2 = fits[roi_labels.index('roi2orOther')]
 
+        pol = np.sum((fit_2 - fit_1m1), axis = 0)/np.sum((fit_2 + fit_1m1), axis = 0)
+        print(pol.shape)
+        pol = pol[[8,]]### TODO: Fix
+        current_globals = np.load(current_folder + "globals.npy", allow_pickle = True)[0]
+        ramsey_time = current_globals['MS_CheckFieldWaitTime']
+
+        if ramsey_time == 0:
+            self.check_field(fits, xlabels)
+            return
+        if fit_2.shape[0] < n_shots or np.max(fit_2) < 100:
+            return
+        print("Adjusting B field via Ramsey: ")
+        ramsey_detuning = current_globals['MS_CheckFieldDetuning']
+        adjusted_delta = np.round(ramsey_detuning - np.mean(np.arccos(pol)/(2 * pi * ramsey_time) * 1e-6), 4)
+        if np.isnan(adjusted_delta):
+            self.run_spectroscopy()
+            return
+        if np.abs(adjusted_delta) > 5e-3:
+            self.run_spectroscopy()
+            return
+        detuning_global = current_globals['MS_KPDetuning']
+        new_freq = np.array([detuning_global + adjusted_delta])
+        new_freq_str = repr(new_freq)
+        new_globals = {
+            'MS_KPDetuning': new_freq_str,
+            'MS_CheckFieldDetuning': '0',
+            'MS_CheckFieldWaitTime': '0',
+            'iteration':'arange(3)'
+        }
+
+        with open(f'{self.holding_folder}/b_field.csv', 'a+') as f:
+            writer = csv.writer(f)
+            writer.writerow([datetime.now().strftime('%Y-%m-%d %H:%M:%S'), detuning_global + adjusted_delta])
+        print(f"Adjusted from {detuning_global} to {new_freq_str}")
+        self.rm_client.set_globals(new_globals, raw = True)
+        self.rm_client.engage()
+
+        self.updated_folders.append(self.folder_to_plot[-6:])
+        return
+
+    def run_spectroscopy(self, type = "imaging"):
+        new_globals = {
+            'CheckMagneticField': 'True',
+            'MS_CheckFieldWaitTime': '0',
+            'MS_CheckFieldDetuning': '1e-3 * np.concatenate([arange(-40, 50, 10), arange(-5, 5, 1)])',
+            'Descriptor':"'CheckSpectroscopy'",
+            'iteration': 'arange(1)'
+        }
+        self.rm_client.set_globals(new_globals, raw = True)
+        self.rm_client.engage()
+
+
+    def check_field(self, fits, xlabel, type = "imaging", n_shots = 2):
+        current_folder = f"{self.holding_folder}/{self.folder_to_plot}/"
+        roi_labels = list(np.load(current_folder + "/roi_labels.npy"))
+        fit_10 = fits[roi_labels.index('roi10')]
+        fit_1m1 = fits[roi_labels.index('roi1-1')]
+        fit_1p1 = fits[roi_labels.index('roi11')]
+        fit_2 = fits[roi_labels.index('roi2orOther')]
+        if fit_2.shape[0] < n_shots or np.max(fit_2) < 100:
+            return
+        pol = np.sum((fit_2 - fit_1m1), axis = 0)/np.sum((fit_2 + fit_1m1), axis = 0)
+        pol = pol[[8,]]### TODO: Fix
+        print("Adjusting B field via Ramsey: ")
+        print(pol)
+        ### If the pi pulse is not really a pi pulse, then do it with spectroscopy
+        if pol < 0.8:
+            self.run_spectroscopy(type)
+            self.updated_folders.append(self.folder_to_plot[-6:])
+        return
 
     def adjust_amplitude_compensation(self, fits, n_traps):
         """
@@ -539,6 +660,48 @@ class AnalysisGUI(QMainWindow, AnalysisUI):
             self.rm_client.engage()
         return
 
+    def __bare_probe_filter__(self, bare_probe):
+        if np.max(bare_probe) < 0.12:
+            return False
+        return True
+
+    def __fit_filter__(self, popt, pstd):
+        print(f"POPT: {popt}")
+        if popt[0] > 1.7 or popt[0] < 0.03:
+            return False
+        if popt[1] < 0.15 or popt[1] > 0.3:
+            return False
+        return True
+
+    def adjust_probe_values(self):
+        print("Adjusting probe values")
+        current_folder = f"{self.holding_folder}/{self.folder_to_plot}/"
+        bare_probes = np.load(
+            current_folder + "/bare_probe.npy", allow_pickle=True)
+        bare_probes = np.array(bare_probes)
+        current_globals = np.load(current_folder + "globals.npy", allow_pickle = True)[0]
+        current_offset = current_globals[agilent_offset_string]
+        current_physics_freq = current_globals[agilent_physics_string]
+        offset = current_offset
+        physics_freq = current_physics_freq
+        guess = [0.1, 0.25, 0, 0]
+        for i in bare_probes[-20:]:
+            i = i - np.mean(i[-50:])
+            if self.__bare_probe_filter__(i):
+                freq = np.linspace(-3.5, 4, len(i))
+                popt, pcov = curve_fit(lorentzian, freq, i,
+                                      bounds = ([0, 0, -np.inf, -np.inf], [4, np.inf, np.inf, np.inf]),
+                                      p0 = guess)
+                pstd = np.diag(np.sqrt(np.abs(pcov)))
+                if self.__fit_filter__(popt, pstd):
+                    _, _, center, _ = popt
+                    offset = np.round(current_offset - center, 1)
+                    physics_freq = np.round(current_physics_freq - center, 1)
+        self.rm_client.set_globals({agilent_offset_string: offset,
+                                    agilent_physics_string: physics_freq})
+        print("Adjusted globals to", {agilent_offset_string: offset,
+                                    agilent_physics_string: physics_freq})
+
     def make_probe_plot(self):
         current_folder = f"{self.holding_folder}/{self.folder_to_plot}/"
         with open(current_folder + "/xlabel.txt", 'r') as xlabel_file:
@@ -567,12 +730,14 @@ class AnalysisGUI(QMainWindow, AnalysisUI):
             ax.set_ylabel(f"Frequency (MHz)")
             self.figure_probe.colorbar(cax, ax=ax)
         except TypeError:
-            print(bare_probes.shape)
+            print("Type Error in Probe plot")
             """
             TODO: Add in error handling
             """
+            traceback.print_exc()
         except IndexError:
-            print(bare_probes.shape)
+            print("IndexError in Probe Plot")
+            traceback.print_exc()
         # Physics probe
         physics_means = np.array(
             [self.__mean_probe_value__(i) for i in physics_probes]

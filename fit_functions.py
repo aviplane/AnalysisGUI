@@ -30,7 +30,7 @@ def flip_flop(t, A, tau, f, phi, slope, offset):
 
 def linear_fit(t,A,B):
     return A*t+B
-    
+
 def quad_fit(t,A,B,C):
     return A*t**2+B*t+C
 
@@ -54,12 +54,12 @@ def rabi_osc_F0(t, A, f, offset, phi0):
     t0=0
     f0 = .25*A*(np.cos(4*pi*f*(t-t0)+phi0)+1) + offset
     return f0
-    
+
 def rabi_osc_Fm1(t, A, f, offset, phi0):
     t0=0
     fm1 = .25*A*(np.cos(2*pi*f*(t-t0) + phi0))**2 + offset
     return fm1
-    
+
 def rabi_osc_no_decay(t,t0, A, f, offset):
 #    t0 = 0
  #   return A * (sin(2*pi*f*(t-t0)/2))**2 * exp(-(t-t0)/tau) + offset
@@ -75,7 +75,7 @@ def rabi_spec(d, t, Frabi, C, K, f0):
     #d = f-f_0#detuning
     #t= 200 #0.035 #length of the Rabi pulse
     return K * (Frabi**2/(Frabi**2+(d-f0)**2)) * (sin(pi*sqrt(Frabi**2+(d-f0)**2)*t))**2+C
-    
+
 def tof_temp(t, T, x0):
     #t is in s
     #x0 in meters
@@ -90,13 +90,12 @@ def exp_decay(t,A, tau, offset):
 
 def exp_decay2(t, A, tau, A2, tau2):
     t0=0
-    return A*exp(-(t-t0)/tau) + A2*exp(-(t-t0)/tau2) 
+    return A*exp(-(t-t0)/tau) + A2*exp(-(t-t0)/tau2)
 
-def gaussian(x, x0, A, sigma, offset):  
+def gaussian(x, x0, A, sigma, offset):
     return A*exp( -((x-x0)**2)/(2*sigma**2)) + offset
-    
+
 def lorentzian(x, A, full_width, x0, offset):
-#    offset = 0
     return A/(1+(2*(x-x0)/full_width)**2)+offset
 
 def double_lorentzian(x, A_1, full_width_1, x0_1, A_2, full_width_2, x0_2, offset):
@@ -110,7 +109,7 @@ def generic_fit(model, xdata, ydata, guesses, hold=False, numpoints=500, meth='l
     else:
         coefs, covar = curve_fit(model, xdata, ydata, guesses, method=meth)#, bounds=bounds)
 #        print("Fit Parameters\n")
-#        print(coefs) 
+#        print(coefs)
 #        print("Fit Errors\n")
 #        print(sqrt(diag(covar)))
     #print([[coefs[nn],sqrt(covar[nn,nn])] for nn in range(len(coefs))])
@@ -147,7 +146,7 @@ def rabi_osc_F1(xdata, ydata, guesses, hold=False, numpoints=100, meth='lm'):
 def gauss2D(x, amplitude, mux, muy, sigmax, sigmay, rotation, slopex, slopey, offset):
     """
     2D Gaussian
-    
+
     Parameters:
         amplitude
         mux

@@ -24,6 +24,7 @@ class AnalysisUI:
         self.checkbox_imaging_calibration = QCheckBox("Imaging Calibration")
         self.checkbox_adjust_amplitudes = QCheckBox(
             "Amplitude Adjustment Feedback")
+        self.checkbox_adjust_probe = QCheckBox("Shift Probe")
         self.checkbox_ignore_first_shot = QCheckBox("Ignore First Shot")
         self.checkbox_delete_reps = QCheckBox("Delete Reps")
 
@@ -85,6 +86,7 @@ class AnalysisUI:
         self.option_selector_layout.addWidget(self.probe_threshold_label)
         self.option_selector_layout.addWidget(self.probe_threshold)
         self.option_selector_layout.addWidget(self.probe_threshold_value_label)
+        self.option_selector_layout.addWidget(self.checkbox_adjust_probe)
 
         self.grid_layout.addLayout(
             self.option_selector_layout, row_num, 0, 1, n_columns - 1)

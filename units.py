@@ -8,6 +8,7 @@ Created on Wed Feb 28 09:20:25 2018
 
 def unitsDef(xlabel_name):
     units_dict = {'CK_SpectrumM4X_TestDetuning': 'MHz',
+                  'CK_MWSweepTime': 'us',
                   'SP_A_uWaveDetuning': 'MHz',
                   'CK_TestuWaveSweepT': 'us',
                   'FI_Ixon_TweezerExpTime': 'us',

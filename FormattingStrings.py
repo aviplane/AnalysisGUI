@@ -19,3 +19,8 @@ compensation_folder = "S:\\Schleier Lab Dropbox\\Cavity Lab Data\\Cavity Lab Scr
 
 def compensation_path(n_traps):
     return f"{compensation_folder}\\amplitude_compensation_{n_traps}.npy"
+
+
+agilent_offset_string = "PR_DLProbe_AOM_FlipFlopFreq_Offset"
+agilent_physics_string = "PR_ShiftedResonance"
+microwave_check_shot_descriptor = 'CheckPiTime'

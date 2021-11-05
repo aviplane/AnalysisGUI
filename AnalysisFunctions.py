@@ -413,6 +413,6 @@ def get_atom_number_from_fluorescence(fluorescence):
     :return atom_number:
     """
 
-    factor = 1/250
+    factor = 1/67
     atom_number = fluorescence * factor
     return atom_number
