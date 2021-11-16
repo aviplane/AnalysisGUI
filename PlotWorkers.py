@@ -12,7 +12,7 @@ from sklearn.decomposition import PCA
 from scipy.stats import norm
 import time
 import queue
-
+import matplotlib.pyplot as plt
 file_save_queue = queue.Queue()
 
 class PlotSaveWorker(QThread):
@@ -123,7 +123,7 @@ class Plot1DWorker(PlotFitWorker):
 
                     transparent_edge_plot(axis,
                                           self.keys_adjusted,
-                                          np.mean(state, axis=1),
+                                          np.mean(state[:, [6, 10]], axis=1),
                                           np.mean(state_std, axis=1),
                                           label=fancy_titles[label])
                     af.save_array(np.mean(state, axis=1),
@@ -205,10 +205,41 @@ class PlotPCAWorker(PlotFitWorker):
         #af.save_figure(self.fig, "pc_pca_copmonents", self.current_folder)
 
 class PlotXYWorker(PlotFitWorker):
+    def jackknife_error(self, arr, statistic):
+        n = np.arange(len(arr))
+        stats = np.array([statistic(np.delete(arr, i, axis = 0)) for i in n])
+        print("STATS", stats.shape)
+        return np.std(stats, axis = 0) * np.sqrt(len(arr))
+
+    def var(self, fit):
+        theta = np.linspace(0, np.pi, 1000)
+        fit_1m1 = fit[:, self.roi_labels.index('roi1-1')]  # fit_sum
+        fit_1p1 = fit[:, self.roi_labels.index('roi11')]  # fit_sum
+        fit_10 = fit[:, self.roi_labels.index('roi10')]
+        fit_sum = (fit_1m1 + fit_1p1 + fit_10)
+        fit_1m1, fit_1p1 = fit_1m1 / fit_sum, fit_1p1 / fit_sum
+
+        pol = fit_1p1 - fit_1m1
+        # shots X sites
+        c_nums = pol[:, ::2] + 1j * pol[:, 1::2]
+        # shots X sites/2
+        mags = np.abs(c_nums)
+        phases = np.angle(c_nums)
+        #phases = phases - phases[:, 0, np.newaxis]
+        adj_cnum = mags * np.exp(1j * phases)
+        x = np.real(adj_cnum)
+        y = np.imag(adj_cnum)
+
+        scaling = np.array([np.mean(np.cos(t)**2 * fit_sum[:, 0] + np.sin(t)**2 * fit_sum[:, 1]) for t in theta])
+        var = np.array([np.var(np.real(mags * np.exp(1j * (phases + t)))) for t in theta])
+        return var * scaling
+
     def run(self):
-        self.fit_mean = self.fit_mean[..., [4, 6, 8, 10, 12, 14]]  # HARD CODED, this is bad
+        self.fit_mean = self.fit_mean[..., [6, 10]]  # HARD CODED, this is bad
+        self.fit_mean = np.array([i for i in self.fit_mean if np.sum(i) > 600])
         if self.fit_mean.shape[0] < 8:
             return
+
         n_traps = self.fit_mean.shape[2]
         self.roi_labels = list(self.roi_labels)
         fit_1m1 = self.fit_mean[:, self.roi_labels.index('roi1-1')]  # fit_sum
@@ -223,15 +254,46 @@ class PlotXYWorker(PlotFitWorker):
         # shots X sites/2
         mags = np.abs(c_nums)
         phases = np.angle(c_nums)
-        phases = phases - phases[:, 0, np.newaxis]
+        #phases = phases - phases[:, 0, np.newaxis]
         adj_cnum = mags * np.exp(1j * phases)
         x = np.real(adj_cnum)
         y = np.imag(adj_cnum)
         self.fig.clf()
-        ax = (self.fig.add_subplot(1, 1, 1))
+        ax = (self.fig.add_subplot(2, 1, 1))
         colors = ["tab:blue", "tab:green", "tab:red"]
-        for e, (x_i, y_i) in enumerate(zip(x.T, y.T)):
-            ax.scatter(x_i, y_i, color = colors[e], alpha = 0.7, )
+        cmap = plt.cm.cividis
+        tot = np.sum(fit_sum, axis  =1)
+        try:
+
+            for e, (x_i, y_i) in enumerate(zip(x.T, y.T)):
+                cax = ax.scatter(x_i, y_i, c = self.xlabels, cmap = cmap, alpha = 0.7, )
+
+                theta = np.linspace(0, 2 * np.pi, 1000)
+    #            ax.plot(theta, np.cos(theta) * np.var(x) + np.sin(theta) * np.var(y))
+            ax.set_aspect('equal')
+            ax.set_xlabel('$S_x$')
+            ax.set_ylabel('$Q_{yz}$')
+            self.fig.colorbar(cax, ax = ax, label = f"{self.xlabel} ({self.units})")
+        except ValueError:
+            print("Waiting for the xlabels in XY plot")
+
+        ax = (self.fig.add_subplot(2, 1, 2))
+        theta = np.linspace(0, np.pi, 1000)
+        error = self.jackknife_error(self.fit_mean, self.var)
+        scaling = np.array([np.mean(np.cos(t)**2 * fit_sum[:, 0] + np.sin(t)**2 * fit_sum[:, 1]) for t in theta])
+        var = np.array([np.var(np.real(mags * np.exp(1j * (phases + t)))) for t in theta])
+        # for i in np.linspace(0, 2, 10):
+        #     ax.fill_between(theta/np.pi, self.var(self.fit_mean) - i * error, self.var(self.fit_mean) + i * error, color = "tab:blue", alpha = 0.2 * np.exp(- i**2),
+        #     edgecolor = None)
+        ax.fill_between(theta/np.pi, self.var(self.fit_mean) - error, self.var(self.fit_mean) + error, color = "tab:blue", alpha = 0.3,
+                        edgecolor = None)
+        ax.fill_between(theta/np.pi, self.var(self.fit_mean) - 2 * error, self.var(self.fit_mean) + 2 * error, color = "tab:blue",
+                        alpha = 0.1,
+                        edgecolor = None)
+        ax.plot(theta/np.pi, self.var(self.fit_mean), c = "tab:blue")
+        ax.set_xlabel("Spinor Phase ($\pi$)")
+        ax.set_ylim(0.5, None)
+        ax.set_ylabel("Variance")
         file_save_queue.put((self.fig, 'pc_xy_plot', self.current_folder))
 
 class PlotCorrelationWorker(PlotFitWorker):

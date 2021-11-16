@@ -294,7 +294,8 @@ class FileSorter(QThread):
     def get_global(self, file_globals, xlabel):
         xlabel_value = file_globals[xlabel]
         if hasattr(xlabel_value, '__iter__'):
-            return xlabel_value[max(self.list_index, len(xlabel_value) - 1)]
+            print("ITER", self.list_index, xlabel_value, len(xlabel_value) - 1)
+            return xlabel_value[min(self.list_index, len(xlabel_value) - 1)]
         return xlabel_value
 
     def process_xlabel(self, xlabel):
@@ -319,6 +320,8 @@ class FileSorter(QThread):
                 return 'Tweezers_AOD0_LoadAmp'
             if 'Tweezer_RamseyPhase' in labels:
                 return labels[(labels.index('Tweezer_RamseyPhase') + 1) % l]
+            if 'SR_GlobalLarmor' in labels:
+                return labels[(labels.index('SR_GlobalLarmor') + 1) % l]
             if 'Raman_RamseyPhase' in labels:
                 return labels[(labels.index('Raman_RamseyPhase') + 1) % l]
             if 'SP_RamseyPulsePhase' in labels:

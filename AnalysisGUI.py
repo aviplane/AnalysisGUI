@@ -363,6 +363,10 @@ class AnalysisGUI(QMainWindow, AnalysisUI):
         import units
         importlib.reload(units)
         from units import unitsDef
+
+        import PlotWorkers
+        importlib.reload(PlotWorkers)
+        from PlotWorkers import Plot1DWorker, Plot2DWorker, Plot1DHistogramWorker, PlotPCAWorker, PlotCorrelationWorker, PlotXYWorker
         self.check_roi_boxes()
         self.folder_to_plot = folder_to_plot
         current_folder = f"{self.holding_folder}/{self.folder_to_plot}/"
@@ -408,7 +412,10 @@ class AnalysisGUI(QMainWindow, AnalysisUI):
                 print(fit_mean.shape)
                 self.adjust_amplitude_compensation(fit_mean, n_traps)
             self.make_probe_plot()
-            if "PairCreation" in self.folder_to_plot and 'time' not in self.folder_to_plot:
+            plotXYWorker = PlotXYWorker(
+                current_folder, self.figure_6, xlabel, units, fits, fit_std, roi_labels, keys_adjusted, rois_to_exclude=self.rois_to_exclude
+            )
+            if "PairCreation" in self.folder_to_plot and 'time' not in self.folder_to_plot or 'iteration' in self.folder_to_plot:
                 self.canvas_corr.setFixedHeight(600)
                 threshold_low = self.corr_threshold_min.value() / 100
                 threshold_high = self.corr_threshold_max.value() / 100
@@ -420,13 +427,12 @@ class AnalysisGUI(QMainWindow, AnalysisUI):
                 )
                 plotCorrelationWorker.set_limits(threshold_low, threshold_high)
                 plotCorrelationWorker.set_normalize(self.checkbox_normalize_correlations.isChecked())
-                plotXYWorker = PlotXYWorker(
-                    current_folder, self.figure_6, xlabel, units, fits, fit_std, roi_labels, keys_adjusted, rois_to_exclude=self.rois_to_exclude
-                )
+                plotXYWorker.xlabels = np.load(current_folder + "/xlabels.npy")
+                self.threadpool.start(plotXYWorker)
+
                 self.threadpool.start(plotPCAworker)
                 #self.threadpool.start(plotCorrelationWorker)
-                self.threadpool.start(plotXYWorker)
-            elif "IntDuration" in self.folder_to_plot or "OG_Duration" in self.folder_to_plot or "SpinExchange" in self.folder_to_plot or 'Raman_RamseyPhase':
+            elif "IntDuration" in self.folder_to_plot or "OG_Duration" in self.folder_to_plot or "SpinExchange" in self.folder_to_plot or 'PhaseImprintPhase' in self.folder_to_plot:
                 self.canvas_corr.setFixedHeight(600)
                 try:
                     self.make_phase_plot(sf, units)
@@ -462,8 +468,9 @@ class AnalysisGUI(QMainWindow, AnalysisUI):
 
         current_date = QtCore.QDate.currentDate().toString(date_format_string)
         if current_date != self.date and self.go_button.text() == 'Stop':
-            time.sleep(60 * 40)
+            time.sleep(60 * 10)
             self.stop_sorting()
+            time.sleep(60 * 40)
             self.date = current_date
             self.picker_date.setDate(QtCore.QDate.currentDate())
             self.set_date(QtCore.QDate.currentDate())
@@ -509,8 +516,8 @@ class AnalysisGUI(QMainWindow, AnalysisUI):
         fit_2 = fits[roi_labels.index('roi2orOther')]
         if fit_2.shape[0] < 19:
             return
-        fit_2 = fit_2[:, [8]]
-        fit_1m1 = fit_1m1[:, [8]]
+        fit_2 = fit_2[:, [10]]
+        fit_1m1 = fit_1m1[:, [10]]
         pol = np.sum((fit_2 - fit_1m1), axis = 1)/np.sum((fit_2 + fit_1m1), axis = 1)
         ### pol has shape n_shots X n_traps
         if np.mean(fit_2 + fit_1m1) < 200:
@@ -533,7 +540,7 @@ class AnalysisGUI(QMainWindow, AnalysisUI):
 
         globals['MS_KPDetuning'] = new_freq_str
         self.updated_folders.append(self.folder_to_plot[-6:])
-        self.rm_client.set_globals(new_globals, raw = True)
+        # self.rm_client.set_globals(new_globals, raw = True)
         ### Get Current B Field with self.rm_client
 
     def adjust_imaging_field_ramsey(self, fits, xlabels, n_shots = 4):
@@ -544,34 +551,23 @@ class AnalysisGUI(QMainWindow, AnalysisUI):
         fit_1p1 = fits[roi_labels.index('roi11')]
         fit_2 = fits[roi_labels.index('roi2orOther')]
 
-        pol = np.sum((fit_2 - fit_1m1), axis = 0)/np.sum((fit_2 + fit_1m1), axis = 0)
+        print('Starting magnetic field analysis')
+        pol = np.sum((fit_1p1 - fit_1m1), axis = 0)/np.sum((fit_1p1 + fit_1m1 + fit_10), axis = 0)
         print(pol.shape)
-        pol = pol[[8,]]### TODO: Fix
+        pol = pol[[10,]]### TODO: Fix
         current_globals = np.load(current_folder + "globals.npy", allow_pickle = True)[0]
-        ramsey_time = current_globals['MS_CheckFieldWaitTime']
+        ramsey_time = current_globals['Raman_CheckMagTime']
 
-        if ramsey_time == 0:
-            self.check_field(fits, xlabels)
-            return
-        if fit_2.shape[0] < n_shots or np.max(fit_2) < 100:
+        if fit_1p1.shape[0] < n_shots or np.max(fit_1p1) < 100:
             return
         print("Adjusting B field via Ramsey: ")
-        ramsey_detuning = current_globals['MS_CheckFieldDetuning']
-        adjusted_delta = np.round(ramsey_detuning - np.mean(np.arccos(pol)/(2 * pi * ramsey_time) * 1e-6), 4)
-        if np.isnan(adjusted_delta):
-            self.run_spectroscopy()
-            return
-        if np.abs(adjusted_delta) > 5e-3:
-            self.run_spectroscopy()
-            return
-        detuning_global = current_globals['MS_KPDetuning']
+        adjusted_delta = np.round(np.mean(np.arcsin(pol)/(2 * pi * ramsey_time) * 1e-6), 4)
+
+        detuning_global = current_globals['Raman_BareFreq']
         new_freq = np.array([detuning_global + adjusted_delta])
         new_freq_str = repr(new_freq)
         new_globals = {
-            'MS_KPDetuning': new_freq_str,
-            'MS_CheckFieldDetuning': '0',
-            'MS_CheckFieldWaitTime': '0',
-            'iteration':'arange(3)'
+            'Raman_BareFreq': new_freq_str
         }
 
         with open(f'{self.holding_folder}/b_field.csv', 'a+') as f:
@@ -579,7 +575,7 @@ class AnalysisGUI(QMainWindow, AnalysisUI):
             writer.writerow([datetime.now().strftime('%Y-%m-%d %H:%M:%S'), detuning_global + adjusted_delta])
         print(f"Adjusted from {detuning_global} to {new_freq_str}")
         self.rm_client.set_globals(new_globals, raw = True)
-        self.rm_client.engage()
+        # self.rm_client.engage()
 
         self.updated_folders.append(self.folder_to_plot[-6:])
         return
@@ -587,13 +583,17 @@ class AnalysisGUI(QMainWindow, AnalysisUI):
     def run_spectroscopy(self, type = "imaging"):
         new_globals = {
             'CheckMagneticField': 'True',
+            'MeasurePairCreation': 'False',
+            'PR_WaitTime':'0',
+            'Tweezers_AOD0_LoadAmp':'21',
+            'Tweezers_AOD0_ImageAmp':'Tweezers_AOD0_LoadAmp + 3',
             'MS_CheckFieldWaitTime': '0',
             'MS_CheckFieldDetuning': '1e-3 * np.concatenate([arange(-40, 50, 10), arange(-5, 5, 1)])',
             'Descriptor':"'CheckSpectroscopy'",
             'iteration': 'arange(1)'
         }
-        self.rm_client.set_globals(new_globals, raw = True)
-        self.rm_client.engage()
+        # self.rm_client.set_globals(new_globals, raw = True)
+        # self.rm_client.engage()
 
 
     def check_field(self, fits, xlabel, type = "imaging", n_shots = 2):
@@ -606,11 +606,11 @@ class AnalysisGUI(QMainWindow, AnalysisUI):
         if fit_2.shape[0] < n_shots or np.max(fit_2) < 100:
             return
         pol = np.sum((fit_2 - fit_1m1), axis = 0)/np.sum((fit_2 + fit_1m1), axis = 0)
-        pol = pol[[8,]]### TODO: Fix
+        pol = pol[[10,]]### TODO: Fix
         print("Adjusting B field via Ramsey: ")
         print(pol)
         ### If the pi pulse is not really a pi pulse, then do it with spectroscopy
-        if pol < 0.8:
+        if pol < 0.7:
             self.run_spectroscopy(type)
             self.updated_folders.append(self.folder_to_plot[-6:])
         return
@@ -667,7 +667,7 @@ class AnalysisGUI(QMainWindow, AnalysisUI):
 
     def __fit_filter__(self, popt, pstd):
         print(f"POPT: {popt}")
-        if popt[0] > 1.7 or popt[0] < 0.03:
+        if popt[0] > 4 or popt[0] < 0.03:
             return False
         if popt[1] < 0.15 or popt[1] > 0.3:
             return False
@@ -684,11 +684,12 @@ class AnalysisGUI(QMainWindow, AnalysisUI):
         current_physics_freq = current_globals[agilent_physics_string]
         offset = current_offset
         physics_freq = current_physics_freq
-        guess = [0.1, 0.25, 0, 0]
+        #A, full_width, x0, offset
         for i in bare_probes[-20:]:
             i = i - np.mean(i[-50:])
             if self.__bare_probe_filter__(i):
-                freq = np.linspace(-3.5, 4, len(i))
+                freq = np.linspace(-4, 4, len(i))
+                guess = [0.1, 0.25, freq[np.argmax(i)], 0]
                 popt, pcov = curve_fit(lorentzian, freq, i,
                                       bounds = ([0, 0, -np.inf, -np.inf], [4, np.inf, np.inf, np.inf]),
                                       p0 = guess)
@@ -700,7 +701,7 @@ class AnalysisGUI(QMainWindow, AnalysisUI):
         self.rm_client.set_globals({agilent_offset_string: offset,
                                     agilent_physics_string: physics_freq})
         print("Adjusted globals to", {agilent_offset_string: offset,
-                                    agilent_physics_string: physics_freq})
+                                    agilent_physics_string: physics_freq}, f"from {current_offset}")
 
     def make_probe_plot(self):
         current_folder = f"{self.holding_folder}/{self.folder_to_plot}/"
@@ -829,7 +830,7 @@ class AnalysisGUI(QMainWindow, AnalysisUI):
         roi_labels = list(np.load(current_folder + "/roi_labels.npy"))
         phase_dict = self.group_shot_globals(fits,
                                              globals_list,
-                                             "Raman_RamseyPhase")
+                                             "SR_GlobalLarmor")
         if len(phase_dict.keys()) < 2:
             return
         fits_x, xlabels = self.sort_phase_list(phase_dict[0], xlabel)
@@ -852,8 +853,8 @@ class AnalysisGUI(QMainWindow, AnalysisUI):
             c_num = np.array([c_num])
         phase = np.angle(c_num)
         contrast = np.abs(c_num)
-        contrast[:, np.delete(np.arange(n_traps), [4, 8, 12, 16])] = 0
-        phase[:, np.delete(np.arange(n_traps), [4, 8, 12, 16])] = 0
+        contrast[:, np.delete(np.arange(n_traps), [6, 10])] = 0
+        phase[:, np.delete(np.arange(n_traps), [6, 10])] = 0
         print("Contrast", contrast.dtype)
         print("phase", phase)
         self.save_array(phase, "phase", current_folder)

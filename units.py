@@ -31,6 +31,7 @@ def unitsDef(xlabel_name):
                   'MS_SweepDuration':'ms',
                   'MS_TweezerSweepWaitTime': 'ms',
                   'MS_TweezerRamseyTime':'us',
+                  'MS_PhaseImprintPhase':'deg',
                   'MWR_SPSweepDuration': 'us',
                   'Raman_BigRamanDuration': 'us',
                   'RamanCooling_Duration': 'ms',
