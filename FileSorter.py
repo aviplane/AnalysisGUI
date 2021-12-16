@@ -1,3 +1,4 @@
+from labscript_utils import h5_lock
 from shutil import move
 import readFiles as rf
 from os.path import basename, normpath, getsize
@@ -14,6 +15,7 @@ from FormattingStrings import *
 from units import unitsDef
 from playsound import playsound
 import importlib
+import h5py
 
 
 class FileSorterSignal(QObject):
@@ -25,7 +27,7 @@ class FileSorter(QThread):
     def __init__(self, script_folder, date, imaging_calibration):
         super(FileSorter, self).__init__()
 
-        self.shot_threshold_size = 9e6
+        self.shot_threshold_size = 2.5e6
         self.script_folder = script_folder
         self.date = date
         self.holding_folder = af.get_holding_folder(
@@ -99,7 +101,7 @@ class FileSorter(QThread):
             if self.xlabel_dict[scan] in self.parameters:
                 self.xlabel_dict[scan] = no_xlabel_string
             extra_params = self.parameter_strings(file, self.parameters)
-            self.folder_to_plot = f"{self.data_folder_dict[scan]}_{extra_params}_{scan[-6:]}"
+            self.folder_to_plot = f"{scan}_{self.data_folder_dict[scan]}_{extra_params}"
             current_folder = f"{self.holding_folder}/{self.folder_to_plot}/"
             filename = f"{current_folder}/xlabel.txt"
             if not os.path.exists(filename):
@@ -140,9 +142,104 @@ class FileSorter(QThread):
             else:
                 # not iterable
                 return f"{np.round(value, 4)}"
-        except: #probably a string, and we're lazy bc friyay
+        except:  # probably a string, and we're lazy bc friyay
             return v
         return
+
+    def extract_counts(self, pic_, ref_pic, short_axis=40, long_axis=80, rotation=-5, counts_to_atoms=216):
+        # define region to adjust background subtraction
+        x_1 = 600
+        x_2 = 800
+        y_1 = 20
+        y_2 = 80
+        # compensation = np.sum(np.sum(pic_[y_1:y_2, x_1:x_2]))\
+        #     / np.sum(np.sum(ref_pic[y_1:y_2, x_1:x_2]))
+        compensation = 1
+
+        # Calculate subtracted ref_pic
+        pic = pic_ - compensation * ref_pic
+
+        # Extract counts for each trap
+        trap_counts = np.zeros(len(af.trap_centers))
+
+        for c_center, val_center in enumerate(af.trap_centers):
+            # cut out relevant part of the pic
+            trap_region = range(int(val_center - af.trap_width / 2),
+                                int(val_center + af.trap_width / 2))
+            sel_trap = pic[:, trap_region]
+
+            # find maximum coordinate
+            y_max, x_max = np.where(sel_trap == np.max(sel_trap))
+
+            x_max = x_max[0] + int(val_center - af.trap_width / 2)
+            y_max = y_max[0]
+
+            x_grid, y_grid = np.meshgrid(
+                np.arange(pic.shape[1]), np.arange(pic.shape[0]))
+
+            # # get filter for atoms
+            phi = rotation / 180 * np.pi
+
+            ellipse_boundary = ((np.cos(phi) * (x_grid - x_max) + np.sin(phi) * (y_grid - y_max))**2 / short_axis**2
+                                + (np.cos(phi) * (y_grid - y_max) - np.sin(phi) * (x_grid - x_max))**2 / long_axis**2)
+
+            trap_filter = ellipse_boundary > 1
+
+            cut_pic = 1 * pic
+            cut_pic[trap_filter] = 0
+
+            trap_counts[c_center] = np.sum(np.sum(cut_pic)) / counts_to_atoms
+
+        return trap_counts
+
+    def get_anums_from_ixon(self, file):
+
+        kin_height = 113
+        f2_region = range(0, kin_height)
+        f1up_region = range(4 * kin_height, 5 * kin_height)
+        f1down_region = range(2 * kin_height, 3 * kin_height)
+        f1mid_region = range(6 * kin_height, 7 * kin_height)
+        remaining_region = range(7 * kin_height, 8 * kin_height)
+        ref_region = range(8 * kin_height, 9 * kin_height)
+
+        atom_images = []
+        with h5py.File(file) as hfile:
+            ixon_image = np.array(
+                hfile['images/ixon/ixonatoms'][0], dtype=float)
+            ref_image = ixon_image[ref_region]
+            atom_images.append(ixon_image[f1down_region])
+            atom_images.append(ixon_image[f1mid_region])
+            atom_images.append(ixon_image[f1up_region])
+            atom_images.append(ixon_image[f2_region])
+            atom_images.append(ixon_image[remaining_region])
+
+        n_traps = len(af.trap_centers)
+        n_states = 5
+        n_atoms = np.zeros((n_states + 1, n_traps))
+        for c_state in range(n_states):
+            n_atoms[c_state] = self.extract_counts(
+                atom_images[c_state], ref_image)
+
+        n_atoms[-1] = np.sum(n_atoms, axis=0)
+        state_labels = ['roi1-1', 'roi10', 'roi11',
+                        'roi2orOther', 'roiRemaining', 'roiSum']
+        return state_labels, n_atoms
+
+    def save_value(self, value, current_folder, file_name, numpy_array=False):
+        file_location = current_folder + f"/{file_name}"
+        try:
+            values = np.load(file_location,
+                             allow_pickle=not numpy_array)
+            if numpy_array:
+                values = np.vstack(values, np.array([value]))
+            else:
+                values = list(values)
+                values.append(value)
+            np.save(file_location, values)
+        except IOError:
+            traceback.print_exc()
+            to_save = np.array([value]) if numpy_array else [value]
+            np.save(file_location, to_save)
 
     def process_file(self, file, current_folder):
         """
@@ -151,22 +248,30 @@ class FileSorter(QThread):
         with open(current_folder + "/xlabel.txt", 'r') as xlabel_file:
             xlabel = xlabel_file.read().strip()
         print(file)
+
         roi_labels, rois = af.extract_rois(file)
+        state_labels, n_states = self.get_anums_from_ixon(file)
         file_globals = af.extract_globals(file)
         tweezer_freqs = file_globals["Tweezers_AOD1_Freqs"]
-        print(tweezer_freqs)
-        fits = np.apply_along_axis(
-            trap_amplitudes_freqs, 1, rois, tweezer_freqs=tweezer_freqs)
         if self.imaging_calibration:
-            print("Adjusting ROIs")
-            fits = self.adjust_rois(fits, roi_labels)
-        physics_probe, bare_probe, bare_input, alarm = self.get_cavity_transmission(file)
+            print("No imaging calibration yet.")
+        physics_probe, bare_probe, bare_input, alarm = self.get_cavity_transmission(
+            file)
         rigol_probe_trace, rigol_probe_time = self.get_rigol_transmission(file)
+        probe_lock_monitor, probe_lock_time = self.get_rigol_transmission(
+            file, "ProbeLockMonitor")
+        probe_lock_signal, _ = self.get_rigol_transmission(
+            file, "ProbeLockSignal")
+        self.save_value(probe_lock_monitor,
+                        current_folder,
+                        "probe_lock_monitor.npy")
+        self.save_value(probe_lock_signal,
+                        current_folder,
+                        "probe_lock_signal.npy")
         if "PairCreation_" in current_folder and alarm:
             print("Probe Out")
             # playsound("beep.mp3")
         try:
-            all_fits = np.load(current_folder + "/all_fits.npy")
             xlabels = np.load(current_folder + "/xlabels.npy")
             globals_list = np.load(current_folder + "/globals.npy",
                                    allow_pickle=True)
@@ -177,11 +282,12 @@ class FileSorter(QThread):
             physics_probe_list = list(np.load(current_folder + "/fzx_probe.npy",
                                               allow_pickle=True))
             all_rois = np.load(current_folder + "/all_rois.npy")
+            all_states = np.load(current_folder + "/all_anums.npy")
             rigol_probe_list = list(
                 np.load(current_folder + "/rigol_probe.npy", allow_pickle=True))
             try:
-                all_fits = np.vstack([all_fits, np.array([fits])])
                 all_rois = np.vstack([all_rois, np.array([rois])])
+                all_states = np.vstack([all_states, np.array([n_states])])
             except ValueError:
                 print(f"Error with file: {file}")
                 traceback.print_exc()
@@ -198,8 +304,8 @@ class FileSorter(QThread):
             globals_list = np.append(globals_list, file_globals)
             np.save(current_folder + "/globals.npy", globals_list)
             np.save(current_folder + "/xlabels.npy", xlabels)
-            np.save(current_folder + "/all_fits.npy", all_fits)
             np.save(current_folder + "/all_rois.npy", all_rois)
+            np.save(current_folder + "/all_anums.npy", all_states)
             np.save(current_folder + "/fzx_probe.npy", physics_probe_list)
             np.save(current_folder + "/bare_probe.npy", bare_probe_list)
             np.save(current_folder + "/bare_input.npy", bare_input_list)
@@ -211,8 +317,9 @@ class FileSorter(QThread):
                 xlabel_value = self.get_global(file_globals, xlabel)
             globals_list = [file_globals]
             np.save(current_folder + "/globals.npy", globals_list)
+            np.save(current_folder + "/state_labels.npy", state_labels)
+            np.save(current_folder + "/all_anums.npy", np.array([n_states]))
             np.save(current_folder + "/roi_labels.npy", roi_labels)
-            np.save(current_folder + "/all_fits.npy", np.array([fits]))
             np.save(current_folder + "/all_rois.npy", np.array([rois]))
             np.save(current_folder + "/xlabels.npy", np.array([xlabel_value]))
             np.save(current_folder + "/fzx_probe.npy", [physics_probe])
@@ -220,7 +327,7 @@ class FileSorter(QThread):
             np.save(current_folder + "/bare_input.npy", [bare_input])
             np.save(current_folder + "/rigol_probe.npy",
                     [rigol_probe_trace])
-            print("Creating fit files...")
+            print("Creating files...")
         return
 
     def get_cavity_transmission(self, file):
@@ -239,7 +346,7 @@ class FileSorter(QThread):
         try:
             probe_input = rf.getdata(file, "InputCavityTransmissionBare")
         except Exception as e:
-            probe_input = [(0,0), (1, 0)]
+            probe_input = [(0, 0), (1, 0)]
 
         bare_probe_processed = self.__process_trace__(bare_probe)
         alarm = False
@@ -258,7 +365,7 @@ class FileSorter(QThread):
             times: numpy array from h5_file (same length as voltages)
         """
         data = rf.getdata(file, h5_string)
-        times = rf.getdata(file, "ScopeTraces/times")
+        times = rf.getdata(file, f"ScopeTraces/times{h5_string}")
         return data, times
 
     def __process_trace__(self, trace):
@@ -293,8 +400,8 @@ class FileSorter(QThread):
 
     def get_global(self, file_globals, xlabel):
         xlabel_value = file_globals[xlabel]
+        # return xlabel_value[0][0]
         if hasattr(xlabel_value, '__iter__'):
-            print("ITER", self.list_index, xlabel_value, len(xlabel_value) - 1)
             return xlabel_value[min(self.list_index, len(xlabel_value) - 1)]
         return xlabel_value
 
@@ -309,9 +416,6 @@ class FileSorter(QThread):
         print(labels)
         l = len(labels)
         if len(labels) == 1:
-            #        if labels[0] == 'SP_RamseyPulsePhase':
-            #            raman_ramsey = True
-            #            return 'run number'
             return labels[0]
         elif len(labels) > 1:
             if 'PR_WaitTime' in labels:
@@ -360,7 +464,10 @@ class FileSorter(QThread):
         try:
             if scan_globals["CheckMagneticField"]:
                 main_string = b_field_check_string
-        except:
+            if scan_globals["CheckMagneticFieldImaging"]:
+                main_string = b_field_check_imaging_string
+        except Exception as e:
+            print("Filesorter line 353", e)
             traceback.print_exc()
         main_string = f"{main_string}"
 

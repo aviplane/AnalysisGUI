@@ -3,6 +3,7 @@ analysis_label_string = "Iteration variable"
 date_format_string = "yyyy-MM-dd"
 no_xlabel_string = "shotnum"
 b_field_check_string = "b_field_check"
+b_field_check_imaging_string = "b_field_imaging_check"
 fancy_titles = {"roi1-1": "1, -1 Atoms",
                 "roiSum": "Total Atoms",
                 "roi2orOther": "F = 2 Atoms",

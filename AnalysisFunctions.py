@@ -23,6 +23,14 @@ rawim_bg = np.load(
 background_components = np.load(
     f"{data_location}Cavity Lab Scripts\\cavity_analysis\\background_components_pca.npy")
 
+roi_location_path = f"{data_location}Cavity Lab Scripts\\cavity_analysis\\roi_selector.npy"
+trap_location_path = f"{data_location}Cavity Lab Scripts\\cavity_analysis\\trap_selector.npy"
+
+_, _, _, _, _, x_start, _, _, _, _ = np.load(roi_location_path)
+n_traps, trap_width, trap_start, trap_distance = np.load(trap_location_path)
+
+trap_centers = np.arange(n_traps) * trap_distance + trap_start + x_start
+
 
 def get_complete_folder_path(apd, datafolder, data_date=str(date.today())):
     fpd = get_holding_folder(apd, data_date)
@@ -32,7 +40,7 @@ def get_complete_folder_path(apd, datafolder, data_date=str(date.today())):
 
 def get_holding_folder(apd, data_date=str(date.today())):
     fpd = data_location + data_date[0:4] + "\\" + \
-          data_date[0:7] + f"\\{data_date}\\{apd}"
+        data_date[0:7] + f"\\{data_date}\\{apd}"
     return fpd
 
 
@@ -413,6 +421,6 @@ def get_atom_number_from_fluorescence(fluorescence):
     :return atom_number:
     """
 
-    factor = 1/67
+    factor = 1 / 67
     atom_number = fluorescence * factor
     return atom_number

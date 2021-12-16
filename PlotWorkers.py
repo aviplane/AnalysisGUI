@@ -15,6 +15,7 @@ import queue
 import matplotlib.pyplot as plt
 file_save_queue = queue.Queue()
 
+
 class PlotSaveWorker(QThread):
     def __init__(self):
 
@@ -26,9 +27,13 @@ class PlotSaveWorker(QThread):
     def run(self):
         while self.running:
             while file_save_queue.qsize() > 0:
-                fig, fname, folder = file_save_queue.get()
-                af.save_figure(fig, fname, folder)
-                QThread.sleep(0.1)
+                try:
+                    fig, fname, folder = file_save_queue.get()
+                    af.save_figure(fig, fname, folder)
+                    QThread.sleep(0.1)
+                except Exception as e:
+                    print(e, "Line 35 in PlotWorkers")
+                    traceback.print_exc()
             QThread.sleep(3)
 
     def stop(self):
@@ -36,6 +41,7 @@ class PlotSaveWorker(QThread):
         if self.folder_to_plot:
             self.signal_output.folder_output_signal.emit(self.folder_to_plot)
         self.terminate()
+
 
 class ProbePlotWorker(QRunnable):
     def __init__(self, current_folder, fig, xlabel, units, keys_adjusted, bare_probes, rigol_probes):
@@ -109,6 +115,7 @@ class Plot1DWorker(PlotFitWorker):
     """
     Worker Thread to make 1D plot
     """
+
     def run(self):
         try:
             self.fig.clf()
@@ -123,7 +130,8 @@ class Plot1DWorker(PlotFitWorker):
 
                     transparent_edge_plot(axis,
                                           self.keys_adjusted,
-                                          np.mean(state[:, [6, 10]], axis=1),
+                                          np.mean(
+                                              state[:, [6, 10]], axis=1),
                                           np.mean(state_std, axis=1),
                                           label=fancy_titles[label])
                     af.save_array(np.mean(state, axis=1),
@@ -167,7 +175,8 @@ class Plot1DHistogramWorker(PlotFitWorker):
 
 class PlotPCAWorker(PlotFitWorker):
     def run(self):
-        self.fit_mean = self.fit_mean[..., [4, 6, 8, 10, 12, 14]]  # HARD CODED, this is bad
+        # HARD CODED, this is bad
+        self.fit_mean = self.fit_mean[..., [4, 6, 8, 10, 12, 14]]
         if self.fit_mean.shape[0] < 8:
             return
         n_traps = self.fit_mean.shape[2]
@@ -200,16 +209,16 @@ class PlotPCAWorker(PlotFitWorker):
             self.fig.colorbar(cax, ax=ax)
             ax.set_xlabel("Trap Index")
             ax_num += 1
-        file_save_queue.put((self.fig, 'pc_pca_components', self.current_folder))
+        file_save_queue.put(
+            (self.fig, 'pc_pca_components', self.current_folder))
 
-        #af.save_figure(self.fig, "pc_pca_copmonents", self.current_folder)
 
 class PlotXYWorker(PlotFitWorker):
     def jackknife_error(self, arr, statistic):
         n = np.arange(len(arr))
-        stats = np.array([statistic(np.delete(arr, i, axis = 0)) for i in n])
+        stats = np.array([statistic(np.delete(arr, i, axis=0)) for i in n])
         print("STATS", stats.shape)
-        return np.std(stats, axis = 0) * np.sqrt(len(arr))
+        return np.std(stats, axis=0) * np.sqrt(len(arr))
 
     def var(self, fit):
         theta = np.linspace(0, np.pi, 1000)
@@ -230,8 +239,10 @@ class PlotXYWorker(PlotFitWorker):
         x = np.real(adj_cnum)
         y = np.imag(adj_cnum)
 
-        scaling = np.array([np.mean(np.cos(t)**2 * fit_sum[:, 0] + np.sin(t)**2 * fit_sum[:, 1]) for t in theta])
-        var = np.array([np.var(np.real(mags * np.exp(1j * (phases + t)))) for t in theta])
+        scaling = np.array([np.mean(
+            np.cos(t)**2 * fit_sum[:, 0] + np.sin(t)**2 * fit_sum[:, 1]) for t in theta])
+        var = np.array(
+            [np.var(np.real(mags * np.exp(1j * (phases + t)))) for t in theta])
         return var * scaling
 
     def run(self):
@@ -254,7 +265,7 @@ class PlotXYWorker(PlotFitWorker):
         # shots X sites/2
         mags = np.abs(c_nums)
         phases = np.angle(c_nums)
-        #phases = phases - phases[:, 0, np.newaxis]
+        # phases = phases - phases[:, 0, np.newaxis]
         adj_cnum = mags * np.exp(1j * phases)
         x = np.real(adj_cnum)
         y = np.imag(adj_cnum)
@@ -262,39 +273,44 @@ class PlotXYWorker(PlotFitWorker):
         ax = (self.fig.add_subplot(2, 1, 1))
         colors = ["tab:blue", "tab:green", "tab:red"]
         cmap = plt.cm.cividis
-        tot = np.sum(fit_sum, axis  =1)
+        tot = np.sum(fit_sum, axis=1)
         try:
 
             for e, (x_i, y_i) in enumerate(zip(x.T, y.T)):
-                cax = ax.scatter(x_i, y_i, c = self.xlabels, cmap = cmap, alpha = 0.7, )
+                cax = ax.scatter(x_i, y_i, c=self.xlabels,
+                                 cmap=cmap, alpha=0.7, )
 
                 theta = np.linspace(0, 2 * np.pi, 1000)
     #            ax.plot(theta, np.cos(theta) * np.var(x) + np.sin(theta) * np.var(y))
             ax.set_aspect('equal')
             ax.set_xlabel('$S_x$')
             ax.set_ylabel('$Q_{yz}$')
-            self.fig.colorbar(cax, ax = ax, label = f"{self.xlabel} ({self.units})")
+            self.fig.colorbar(
+                cax, ax=ax, label=f"{self.xlabel} ({self.units})")
         except ValueError:
             print("Waiting for the xlabels in XY plot")
 
         ax = (self.fig.add_subplot(2, 1, 2))
         theta = np.linspace(0, np.pi, 1000)
         error = self.jackknife_error(self.fit_mean, self.var)
-        scaling = np.array([np.mean(np.cos(t)**2 * fit_sum[:, 0] + np.sin(t)**2 * fit_sum[:, 1]) for t in theta])
-        var = np.array([np.var(np.real(mags * np.exp(1j * (phases + t)))) for t in theta])
+        scaling = np.array([np.mean(
+            np.cos(t)**2 * fit_sum[:, 0] + np.sin(t)**2 * fit_sum[:, 1]) for t in theta])
+        var = np.array(
+            [np.var(np.real(mags * np.exp(1j * (phases + t)))) for t in theta])
         # for i in np.linspace(0, 2, 10):
         #     ax.fill_between(theta/np.pi, self.var(self.fit_mean) - i * error, self.var(self.fit_mean) + i * error, color = "tab:blue", alpha = 0.2 * np.exp(- i**2),
         #     edgecolor = None)
-        ax.fill_between(theta/np.pi, self.var(self.fit_mean) - error, self.var(self.fit_mean) + error, color = "tab:blue", alpha = 0.3,
-                        edgecolor = None)
-        ax.fill_between(theta/np.pi, self.var(self.fit_mean) - 2 * error, self.var(self.fit_mean) + 2 * error, color = "tab:blue",
-                        alpha = 0.1,
-                        edgecolor = None)
-        ax.plot(theta/np.pi, self.var(self.fit_mean), c = "tab:blue")
+        ax.fill_between(theta / np.pi, self.var(self.fit_mean) - error, self.var(self.fit_mean) + error, color="tab:blue", alpha=0.3,
+                        edgecolor=None)
+        ax.fill_between(theta / np.pi, self.var(self.fit_mean) - 2 * error, self.var(self.fit_mean) + 2 * error, color="tab:blue",
+                        alpha=0.1,
+                        edgecolor=None)
+        ax.plot(theta / np.pi, self.var(self.fit_mean), c="tab:blue")
         ax.set_xlabel("Spinor Phase ($\pi$)")
         ax.set_ylim(0.5, None)
         ax.set_ylabel("Variance")
         file_save_queue.put((self.fig, 'pc_xy_plot', self.current_folder))
+
 
 class PlotCorrelationWorker(PlotFitWorker):
     def set_normalize(self, normalize):
@@ -308,7 +324,8 @@ class PlotCorrelationWorker(PlotFitWorker):
         if self.fit_mean.shape[0] < 2:
             return
         self.roi_labels = list(self.roi_labels)
-        self.fit_mean = self.fit_mean[...,  [4, 6, 8, 10, 12, 14]]  # HARD CODED, this is bad
+        # HARD CODED, this is bad
+        self.fit_mean = self.fit_mean[...,  [4, 6, 8, 10, 12, 14]]
         fit_10 = self.fit_mean[:, self.roi_labels.index('roi10')]
         fit_1m1 = self.fit_mean[:, self.roi_labels.index('roi1-1')]
         fit_1p1 = self.fit_mean[:, self.roi_labels.index('roi11')]
@@ -333,7 +350,7 @@ class PlotCorrelationWorker(PlotFitWorker):
             (fit_1p1 / fit_sum).T)[:n_traps, n_traps:]
         pol = (fit_1p1 - fit_1m1) / fit_sum
         if self.normalize:
-            corr_sidemode = np.corrcoef(pol, rowvar = False)
+            corr_sidemode = np.corrcoef(pol, rowvar=False)
         else:
             corr_sidemode = np.cov(pol, rowvar=False)
 
@@ -365,7 +382,8 @@ class PlotCorrelationWorker(PlotFitWorker):
             cmap=correlation_colormap)
         axes[1].set_xlabel("1, -1 trap index")
         axes[1].set_ylabel("1, 1 trap index")
-        axes[1].set_title(f"Polarization Covariance ({'' if self.normalize else 'not '}normalized)")
+        axes[1].set_title(
+            f"Polarization Covariance ({'' if self.normalize else 'not '}normalized)")
         self.fig.colorbar(cax, ax=axes[1])
         af.save_array(corr_sidemode, "pol_cov", self.current_folder)
         positions = list(range(-n_traps + 1, n_traps))
