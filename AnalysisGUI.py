@@ -68,6 +68,9 @@ class AnalysisGUI(QMainWindow, AnalysisUI):
         self.checkbox_adjust_probe.stateChanged.connect(
             self.set_adjust_probe
         )
+        self.checkbox_shot_alert.stateChanged.connect(
+            self.set_shot_alerts
+        )
         self.corr_threshold_min.sliderReleased.connect(self.set_corr_threshold)
         self.corr_threshold_max.sliderReleased.connect(self.set_corr_threshold)
         self.probe_threshold.sliderReleased.connect(self.set_probe_threshold)
@@ -89,6 +92,12 @@ class AnalysisGUI(QMainWindow, AnalysisUI):
         self.updated_folders = []  # BAD HACK BAD
         self.plot_saver = PlotWorkers.PlotSaveWorker()
         self.plot_saver.start()
+
+    def set_shot_alerts(self):
+        try:
+            self.worker.alert_system.do_alerts = self.checkbox_shot_alert.isChecked()
+        except Exception as e:
+            traceback.print_exc()
 
     def set_date(self, date):
         self.date = date.toString(date_format_string)
@@ -243,6 +252,7 @@ class AnalysisGUI(QMainWindow, AnalysisUI):
             self.worker = FileSorter(
                 self.script_folder, self.date, self.imaging_calibration)
             self.worker.parameters = self.parameters
+            self.worker.alert_system.do_alerts = self.checkbox_shot_alert.isChecked()
             self.worker.signal_output.folder_output_signal.connect(
                 self.make_plots)
             self.worker.start()
@@ -751,10 +761,10 @@ class AnalysisGUI(QMainWindow, AnalysisUI):
                     _, _, center, _ = popt
                     offset = np.round(current_offset - center, 1)
                     physics_freq = np.round(current_physics_freq - center, 1)
-        self.rm_client.set_globals({agilent_offset_string: offset,
-                                    agilent_physics_string: physics_freq})
+        self.rm_client.set_globals({agilent_offset_string: offset})  # ,
+#                                    agilent_physics_string: physics_freq})
         print("Adjusted globals to", {agilent_offset_string: offset,
-                                      agilent_physics_string: physics_freq}, f"from {current_offset}")
+                                      }, f"from {current_offset}")
 
     def make_probe_plot(self):
         current_folder = f"{self.holding_folder}/{self.folder_to_plot}/"
@@ -805,6 +815,25 @@ class AnalysisGUI(QMainWindow, AnalysisUI):
         ax.set_ylabel("Mean APD Voltage")
         ax.set_xlabel(f"{xlabel} ({units})")
         af.save_array(physics_means, "mean_probe_physics", current_folder)
+        if "cavity_shift" in self.folder_to_plot:
+            try:
+                #A, full_width, x0, offset
+                popt, pcov = curve_fit(lorentzian,
+                                       keys_adjusted[sorting_order],
+                                       physics_means[sorting_order],
+                                       bounds=([0, 0.05, min(keys_adjusted), -0.01],
+                                               [0.5, 0.5, max(keys_adjusted), 0.01]))
+
+                pstd = np.sqrt(np.diag(pcov))
+                if popt[0] > 0.03 and len(keys_adjusted) > 14:
+                    self.rm_client.set_globals(
+                        {shifted_resonance_string: f"{popt[2]:.4g}"},
+                        raw=True)
+                key_fine = np.linspace(np.min(keys_adjusted),
+                                       np.max(keys_adjusted))
+                ax.plot(key_fine, lorentzian(key_fine, *popt))
+            except:
+                traceback.print_exc()
         #af.save_figure(self.figure_probe, "probe", current_folder)
         print("Putting Probe figure in queue")
         PlotWorkers.file_save_queue.put(

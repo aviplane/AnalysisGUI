@@ -16,10 +16,49 @@ from units import unitsDef
 from playsound import playsound
 import importlib
 import h5py
+import GmailAlert
+import time
 
 
 class FileSorterSignal(QObject):
     folder_output_signal = pyqtSignal(str)
+
+
+class AlertSystem():
+    def __init__(self):
+        self.do_alerts = False
+        self.gmail = GmailAlert.GmailAlert()
+        self.refresh_time = time.time()
+        self.to_send = ['3016054695@tmomail.net',
+                        'escooper@stanford.edu',
+                        'kunkel@stanford.edu',
+                        'avikar@stanford.edu']
+        self.refresh_period = 45  # minutes
+        self.sent_alert = False
+        self.bad_shot_counter = 0
+        self.bad_shot_threshold = 4
+
+    def check_refresh(self,):
+        current_time = time.time()
+        if current_time - self.refresh_time > 60 * self.refresh_period:
+            self.gmail = GmailAlert.GmailAlert()
+            self.refresh_time = current_time
+        return
+
+    def good_shot(self):
+        self.sent_alert = False
+        self.bad_shot_counter = 0
+
+    def bad_shot(self):
+        self.bad_shot_counter += 1
+
+    def mot_problem(self):
+        self.bad_shot_counter += 1
+        if not self.sent_alert and self.bad_shot_counter > self.bad_shot_threshold:
+            [self.gmail.send_error_message(email, "MOT out")
+             for email in self.to_send]
+            self.sent_alert = True
+        return
 
 
 class FileSorter(QThread):
@@ -39,6 +78,7 @@ class FileSorter(QThread):
         self.parameters = []
         self.delete_reps = False
         self.list_index = 0
+        self.alert_system = AlertSystem()
 
         try:
             with open(self.holding_folder + "/folder_dict.json", 'r') as dict_file:
@@ -59,7 +99,7 @@ class FileSorter(QThread):
                     self.folder_to_plot)
             else:
                 print("No Folders made yet")
-            QThread.sleep(6)
+            QThread.sleep(3)
         print("Thread ended")
 
     def stop(self):
@@ -119,6 +159,7 @@ class FileSorter(QThread):
             except Exception as e:
                 print(e)
                 traceback.print_exc()
+            self.alert_system.check_refresh()
         print("Done sorting")
         return self.folder_to_plot
 
@@ -241,6 +282,12 @@ class FileSorter(QThread):
             to_save = np.array([value]) if numpy_array else [value]
             np.save(file_location, to_save)
 
+    def check_MOT(self, file):
+        mot = np.squeeze(rf.getdata(file, 'MOTatoms'))
+        print("MOT max", np.max(mot))
+        if np.max(mot) > 300:
+            return True
+
     def process_file(self, file, current_folder):
         """
         TODO: Add in probe processing
@@ -268,6 +315,14 @@ class FileSorter(QThread):
         self.save_value(probe_lock_signal,
                         current_folder,
                         "probe_lock_signal.npy")
+
+        good_MOT = self.check_MOT(file)
+
+        if self.alert_system.do_alerts:
+            if not good_MOT:
+                self.alert_system.mot_problem()
+            if good_MOT:
+                self.alert_system.good_shot()
         if "PairCreation_" in current_folder and alarm:
             print("Probe Out")
             # playsound("beep.mp3")
@@ -453,7 +508,6 @@ class FileSorter(QThread):
         else:
             xlabel = self.choose_xlabel(xlabels)
             main_string = self.process_xlabel(xlabel)
-
         if scan_globals["MeasurePairCreation"]:
             main_string = 'PairCreation_' + main_string
         if scan_globals["MeasureSpinExchange"]:
