@@ -24,6 +24,8 @@ from PyQt5.QtCore import *
 import AnalysisFunctions as af
 from colorcet import cm
 import matplotlib.pyplot as plt
+#from matplotlib.backends.backend_qtagg import FigureCanvasQTAgg as FigureCanvas
+#from matplotlib.backends.backend_qtagg import NavigationToolbar2QT as NavigationToolbar
 from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg as FigureCanvas
 from matplotlib.backends.backend_qt4agg import NavigationToolbar2QT as NavigationToolbar
 from AnalysisUI import AnalysisUI
@@ -41,6 +43,8 @@ import AnalysisFunctions
 
 pi = np.pi
 
+select_traps = [10]
+
 
 class AnalysisGUI(QMainWindow, AnalysisUI):
     def __init__(self, app):
@@ -50,14 +54,13 @@ class AnalysisGUI(QMainWindow, AnalysisUI):
         self.create_ui(self)
         self.cb_script.currentIndexChanged.connect(self.set_script_folder)
         self.cb_data.activated.connect(self.set_data_folder)
+        self.button_refresh_data.clicked.connect(self.set_data_folder)
         self.picker_date.dateChanged.connect(self.set_date)
         self.parameters_lineedit.returnPressed.connect(self.set_parameters)
         self.index_lineedit.returnPressed.connect(self.set_list_index)
         self.f2_threshold_input.returnPressed.connect(self.set_f2_threshold)
         self.f2_threshold_checkbox.stateChanged.connect(
             self.set_f2_threshold)
-        self.go_button.clicked.connect(
-            self.make_sorter_thread)  # self.sort_all_files)
         self.checkbox_imaging_calibration.stateChanged.connect(
             self.set_imaging_calibration)
         self.checkbox_adjust_amplitudes.stateChanged.connect(
@@ -71,10 +74,10 @@ class AnalysisGUI(QMainWindow, AnalysisUI):
         self.checkbox_shot_alert.stateChanged.connect(
             self.set_shot_alerts
         )
-        self.corr_threshold_min.sliderReleased.connect(self.set_corr_threshold)
-        self.corr_threshold_max.sliderReleased.connect(self.set_corr_threshold)
+        self.button_reset_mail.clicked.connect(self.reset_probe_mails)
         self.probe_threshold.sliderReleased.connect(self.set_probe_threshold)
         self.date = QtCore.QDate.currentDate().toString(date_format_string)
+        self.traps = np.array([10])
         self.script_folder = ""
         self.shot_threshold_size = 2e6
         self.data_folder_dict = {}
@@ -99,6 +102,13 @@ class AnalysisGUI(QMainWindow, AnalysisUI):
         except Exception as e:
             traceback.print_exc()
 
+    def reset_probe_mails(self):
+        try:
+            self.worker.alert_system.n_mails = 0
+            print('Congrats, you pushed me')
+        except Exception as e:
+            traceback.print_exc()
+
     def set_date(self, date):
         self.date = date.toString(date_format_string)
         self.set_script_cb()
@@ -118,14 +128,6 @@ class AnalysisGUI(QMainWindow, AnalysisUI):
         except:
             print("Error making plots after setting ignore first shots")
             traceback.print_exc()
-
-    def set_delete_reps(self):
-        delete_reps = self.checkbox_delete_reps.isChecked()
-        try:
-            self.worker.delete_reps = delete_reps
-        except AttributeError as e:
-            print(
-                f"Trying to set delete reps to {delete_reps}, but no file sorter worker yet...")
 
     def set_parameters(self):
         parameter_text = self.parameters_lineedit.text()
@@ -205,18 +207,6 @@ class AnalysisGUI(QMainWindow, AnalysisUI):
         except:
             traceback.print_exc()
 
-    def set_corr_threshold(self):
-        min_value = self.corr_threshold_min.value() / 100
-        self.corr_min_value.setText(f"{min_value:.2f}")
-
-        max_value = self.corr_threshold_max.value() / 100
-        self.corr_max_value.setText(f"{max_value:.2f}")
-
-        try:
-            self.make_plots(self.folder_to_plot)
-        except:
-            traceback.print_exc()
-
     def set_probe_threshold(self):
         try:
             current_folder = current_folder = f"{self.holding_folder}/{self.folder_to_plot}/"
@@ -240,34 +230,14 @@ class AnalysisGUI(QMainWindow, AnalysisUI):
     def set_data_folder(self):
         folder_to_plot = self.cb_data.currentText()
         try:
-            if not self.worker.running and folder_to_plot != "":
-                self.make_plots(folder_to_plot)
+            self.make_plots(folder_to_plot)
         except AttributeError:
             self.make_plots(folder_to_plot)
-
-    def make_sorter_thread(self):
-        if self.go_button.text() == 'Go':
-            print("Start")
-            # Any other args, kwargs are passed to the run function
-            self.worker = FileSorter(
-                self.script_folder, self.date, self.imaging_calibration)
-            self.worker.parameters = self.parameters
-            self.worker.alert_system.do_alerts = self.checkbox_shot_alert.isChecked()
-            self.worker.signal_output.folder_output_signal.connect(
-                self.make_plots)
-            self.worker.start()
-            self.worker.list_index = self.list_index
-            self.go_button.setText("Stop")
-        elif self.go_button.text() == 'Stop':
-            self.worker.stop()
-            self.go_button.setText("Go")
-            print("Stopping sorting thread")
 
     def stop_sorting(self):
         try:
             self.worker.folder_to_plot = False
             self.worker.stop()
-            self.go_button.setText("Go")
             print("Stopping sorting thread...")
         except Exception as e:
             print(e)
@@ -350,7 +320,7 @@ class AnalysisGUI(QMainWindow, AnalysisUI):
         Update the date if it changed
         """
         current_date = QtCore.QDate.currentDate().toString(date_format_string)
-        if current_date != self.date and self.go_button.text() == 'Stop':
+        if current_date != self.date:
             time.sleep(60 * 40)
             self.stop_sorting()
             self.date = current_date
@@ -370,6 +340,8 @@ class AnalysisGUI(QMainWindow, AnalysisUI):
         import PlotWorkers
         importlib.reload(PlotWorkers)
         from PlotWorkers import Plot1DWorker, Plot2DWorker, Plot1DHistogramWorker, PlotPCAWorker, PlotCorrelationWorker, PlotXYWorker
+        if not self.plot_saver.running:
+            self.plot_saver.start()
         self.check_roi_boxes()
         self.folder_to_plot = folder_to_plot
         current_folder = f"{self.holding_folder}/{self.folder_to_plot}/"
@@ -377,10 +349,10 @@ class AnalysisGUI(QMainWindow, AnalysisUI):
             xlabel = xlabel_file.read().strip()
         sf, units = unitsDef(xlabel)
 
-        fits = np.load(current_folder + "/all_rois.npy")
-        fits = np.apply_along_axis(
-            AnalysisFunctions.get_trap_counts_from_roi, 2, fits)
-        print(fits.shape)
+        # fits = np.load(current_folder + "/all_rois.npy")
+        # fits = np.apply_along_axis(
+        #     AnalysisFunctions.get_trap_counts_from_roi, 2, fits)
+        # print(fits.shape)
         fits = np.load(current_folder + "/all_anums.npy")
         print(fits.shape)
         # fits = AnalysisFunctions.get_atom_number_from_fluorescence(fits)
@@ -394,6 +366,11 @@ class AnalysisGUI(QMainWindow, AnalysisUI):
         fits, xlabels = self.select_probe_threshold(
             fits, xlabels, physics_probes)
         roi_labels = np.load(current_folder + "/state_labels.npy")
+        all_globals = np.load(
+            current_folder + "/globals.npy", allow_pickle=True)[0]
+        traps = [i for i in np.arange(
+            18) if i not in all_globals['Tweezers_AOD1_DeleteTraps']]
+        print("Expected Traps: ", traps)
 #        fits, xlabels = self.select_f2_threshold(fits, xlabels, roi_labels)
         if len(fits) < 1:
             return
@@ -407,19 +384,12 @@ class AnalysisGUI(QMainWindow, AnalysisUI):
         plot1dworker = Plot1DWorker(current_folder, self.figure_1d, xlabel, units,
                                     fit_mean, fit_std, roi_labels, keys_adjusted, rois_to_exclude=self.rois_to_exclude)
         plot1dworker.f2_threshold = self.f2_threshold
+        plot1dworker.traps = traps
+        self.traps = traps
+        self.trap_selector_label.setText(
+            f"Traps: {' '.join(str(i) for i in self.traps)}")
         plot2dworker = Plot2DWorker(current_folder, self.figure_2d, xlabel, units,
                                     fit_mean, fit_std, roi_labels, keys_adjusted, rois_to_exclude=self.rois_to_exclude)
-        try:
-            if b_field_check_string in self.folder_to_plot and self.folder_to_plot[:5] not in self.updated_folders:
-                if xlabel == 'iteration':
-                    self.adjust_raman_field_ramsey(fit_mean, xlabels)
-            if b_field_check_imaging_string in self.folder_to_plot and self.folder_to_plot[:5] not in self.updated_folders:
-                if xlabel == "MS_CheckFieldDetuning":
-                    self.adjust_imaging_field(fit_mean, xlabels)
-                elif xlabel == 'iteration':
-                    self.adjust_imaging_field_ramsey(fit_mean, xlabels)
-        except:
-            traceback.print_exc()
 
         try:
             self.threadpool.start(plot1dworker)
@@ -476,15 +446,6 @@ class AnalysisGUI(QMainWindow, AnalysisUI):
             except:
                 traceback.print_exc()
 
-        current_date = QtCore.QDate.currentDate().toString(date_format_string)
-        if current_date != self.date and self.go_button.text() == 'Stop':
-            self.stop_sorting()
-            time.sleep(60 * 40)
-            self.date = current_date
-            self.picker_date.setDate(QtCore.QDate.currentDate())
-            self.set_date(QtCore.QDate.currentDate())
-            self.make_sorter_thread()
-
     def select_probe_threshold(self, fits, xlabels, physics_probes):
         if self.checkbox_probe_threhold.isChecked():
             mean_probe = np.array([self.__mean_probe_value__(i)
@@ -525,8 +486,8 @@ class AnalysisGUI(QMainWindow, AnalysisUI):
         fit_2 = fits[roi_labels.index('roi2orOther')]
         if fit_2.shape[0] < 19:
             return
-        fit_2 = fit_2[:, [10]]
-        fit_1m1 = fit_1m1[:, [10]]
+        fit_2 = fit_2[:, self.traps]
+        fit_1m1 = fit_1m1[:, self.traps]
         pol = np.sum((fit_2 - fit_1m1), axis=1) / \
             np.sum((fit_2 + fit_1m1), axis=1)
         # pol has shape n_shots X n_traps
@@ -553,6 +514,52 @@ class AnalysisGUI(QMainWindow, AnalysisUI):
         self.updated_folders.append(self.folder_to_plot[-6:])
         # self.rm_client.set_globals(new_globals, raw = True)
         # Get Current B Field with self.rm_client
+
+    def adjust_cleaning_field(self, fits, xlabels):
+        """
+        Adjust the frequencies of the magnetic fields to accound for slow drifts
+        in the magnetic field during the cleaning portion of the sequence.
+        """
+        current_folder = f"{self.holding_folder}/{self.folder_to_plot}/"
+        roi_labels = list(np.load(current_folder + "/roi_labels.npy"))
+        fit_10 = fits[roi_labels.index('roi10')]
+        fit_1m1 = fits[roi_labels.index('roi1-1')]
+        fit_1p1 = fits[roi_labels.index('roi11')]
+        fit_2 = fits[roi_labels.index('roi2orOther')]
+        if fit_2.shape[0] < 21:
+            return
+
+        globals = self.rm_client.get_globals(raw=True)
+        if len(self.traps) > 1:
+            population_1m1 = np.sum(fit_1m1[:, self.traps], axis=1)
+        else:
+            population_1m1 = np.squeeze(fit_1m1[:, self.traps])
+
+        filter_f1 = population_1m1 < 1000
+        if np.sum(filter_f1) < 5:
+            print('MOT seems to be out for the cleaning adjustment')
+            return
+
+        print("Adjusting cleaning B Field")
+        optimal_detuning = xlabels[np.argmin(population_1m1)]
+        print(f"optimal_detuning: {optimal_detuning}")
+
+        freq_global = globals['CK_MWCleanPrep_Freq']
+        previous_freq = eval(freq_global)
+        new_freq = previous_freq + optimal_detuning
+        new_freq_str = repr(new_freq)
+        new_globals = {
+            'CK_MWCleanPrep_Freq': new_freq_str,
+            'CheckMagneticFieldCleaning': 'False'
+        }
+        with open(f'{self.holding_folder}/b_field.csv', 'a+') as f:
+            writer = csv.writer(f)
+            writer.writerow(
+                [datetime.now().strftime('%Y-%m-%d %H:%M:%S'), 'Cleaning', new_freq])
+
+        print(
+            f"Adjusted cleaning field from {freq_global} to {new_freq_str}")
+        self.rm_client.set_globals(new_globals, raw=True)
 
     def adjust_raman_field_ramsey(self, fits, xlabels, n_shots=4):
         current_folder = f"{self.holding_folder}/{self.folder_to_plot}/"
@@ -616,7 +623,7 @@ class AnalysisGUI(QMainWindow, AnalysisUI):
         ramsey_time = current_globals['MS_CheckFieldWaitTime']
         ramsey_detuning = current_globals['MS_CheckFieldDetuning']
 
-        if fit_2.shape[0] < n_shots or np.max(fit_2) < 500:
+        if fit_2.shape[0] < n_shots or np.max(fit_1m1 + fit_2) < 1000:
             return
         print("Adjusting B field via Ramsey: ")
         adjusted_delta = np.round(
@@ -691,13 +698,13 @@ class AnalysisGUI(QMainWindow, AnalysisUI):
         fit_10 = fits[roi_labels.index('roi10')]
         fit_1m1 = fits[roi_labels.index('roi1-1')]
         fit_1p1 = fits[roi_labels.index('roi11')]
-        fit_sum = fit_10 + fit_1m1 + fit_1p1
+        fit_sum = fit_10  # + fit_1m1 + fit_1p1
         print(fit_sum.shape)
         trap_values = np.mean(fit_sum, axis=0)
         assert n_traps == len(trap_values), f"{n_traps} {len(trap_values)}"
         # Reverse, since the frequency -> trap ordering is reversed
         if len(fit_sum) > 2 and len(fit_sum) % 4 == 0:
-            sites = np.arange(4, 15, 2)  # [4, 8, 12, 16]
+            sites = self.traps
             saved_path = compensation_path(len(sites))
             print(f"Attempting to load from {saved_path}")
             try:
@@ -747,15 +754,15 @@ class AnalysisGUI(QMainWindow, AnalysisUI):
         offset = current_offset
         physics_freq = current_physics_freq
         #A, full_width, x0, offset
-        for i in bare_probes[-20:]:
+        for i in bare_probes[-6:]:
             i = i - np.mean(i[-50:])
             if self.__bare_probe_filter__(i):
                 freq = np.linspace(-4, 4, len(i))
-                guess = [0.1, 0.25, freq[np.argmax(i)], 0]
+                guess = [np.max(i), 0.25, freq[np.argmax(i)], 0]
                 popt, pcov = curve_fit(lorentzian, freq, i,
                                        bounds=([0, 0, -np.inf, -np.inf],
-                                               [4, np.inf, np.inf, np.inf]),
-                                       p0=guess)
+                                               [2 * np.max(i), np.inf, np.inf, np.inf]),
+                                       p0=guess, ftol=1e-4, xtol=1e-3)
                 pstd = np.diag(np.sqrt(np.abs(pcov)))
                 if self.__fit_filter__(popt, pstd):
                     _, _, center, _ = popt
@@ -809,6 +816,7 @@ class AnalysisGUI(QMainWindow, AnalysisUI):
         ax = self.figure_probe.add_subplot(1, 2, 2)
         transparent_edge_plot(
             ax, keys_adjusted[sorting_order], physics_means[sorting_order])
+
         ax.axhline(float(self.probe_threshold_value),
                    ls='--',  c="r", label="Probe Threshold")
         ax.legend()
@@ -822,7 +830,12 @@ class AnalysisGUI(QMainWindow, AnalysisUI):
                                        keys_adjusted[sorting_order],
                                        physics_means[sorting_order],
                                        bounds=([0, 0.05, min(keys_adjusted), -0.01],
-                                               [0.5, 0.5, max(keys_adjusted), 0.01]))
+                                               [0.5, 0.5, max(keys_adjusted), 0.01]),
+                                       p0=[0.06, 0.2,
+                                           keys_adjusted[np.argmax(
+                                               physics_means[sorting_order])],
+                                           0
+                                           ])
 
                 pstd = np.sqrt(np.diag(pcov))
                 if popt[0] > 0.03 and len(keys_adjusted) > 14:
@@ -830,14 +843,15 @@ class AnalysisGUI(QMainWindow, AnalysisUI):
                         {shifted_resonance_string: f"{popt[2]:.4g}"},
                         raw=True)
                 key_fine = np.linspace(np.min(keys_adjusted),
-                                       np.max(keys_adjusted))
-                ax.plot(key_fine, lorentzian(key_fine, *popt))
+                                       np.max(keys_adjusted), 1000)
+                ax.plot(key_fine, lorentzian(
+                    key_fine, *popt), '--', c="tab:blue")
             except:
                 traceback.print_exc()
         #af.save_figure(self.figure_probe, "probe", current_folder)
         print("Putting Probe figure in queue")
-        PlotWorkers.file_save_queue.put(
-            (self.figure_probe, "probe", current_folder))
+        # PlotWorkers.file_save_queue.put(
+        #     (self.figure_probe, "probe", current_folder))
         self.canvas_probe.draw()
 
     def __mean_probe_value__(self, probe):
@@ -864,7 +878,7 @@ class AnalysisGUI(QMainWindow, AnalysisUI):
         with open(current_folder + "/xlabel.txt", 'r') as xlabel_file:
             xlabel = xlabel_file.read().strip()
         sf, units = unitsDef(xlabel)
-        fits = np.load(current_folder + "/all_fits.npy")
+        fits = np.load(current_folder + "/all_anums.npy")
         if len(fits) < 2:
             return
         xlabels = np.load(current_folder + "/xlabels.npy")
@@ -894,6 +908,7 @@ class AnalysisGUI(QMainWindow, AnalysisUI):
         self.canvas_corr.draw()
 
     def make_phase_plot(self, sf, units):
+        print("Making Phase Plot")
         current_folder = f"{self.holding_folder}/{self.folder_to_plot}/"
         with open(current_folder + "/xlabel.txt", 'r') as xlabel_file:
             xlabel = xlabel_file.read().strip()
@@ -913,7 +928,7 @@ class AnalysisGUI(QMainWindow, AnalysisUI):
         roi_labels = list(np.load(current_folder + "/roi_labels.npy"))
         phase_dict = self.group_shot_globals(fits,
                                              globals_list,
-                                             "SR_GlobalLarmor")
+                                             "Raman_RamseyPhase")
         if len(phase_dict.keys()) < 2:
             return
         fits_x, xlabels = self.sort_phase_list(phase_dict[0], xlabel)
@@ -976,7 +991,7 @@ class AnalysisGUI(QMainWindow, AnalysisUI):
         cax = ax_y.imshow(y_pol, cmap=magnetization_colormap, aspect="auto", extent=extent,
                           vmin=-1, vmax=1)
         self.figure_phase.colorbar(cax, ax=ax_y)
-        af.save_figure(self.figure_phase, "phase_plot", current_folder)
+        # af.save_figure(self.figure_phase, "phase_plot", current_folder)
 
         self.canvas_phase.draw()
 

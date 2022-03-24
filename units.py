@@ -9,6 +9,7 @@ Created on Wed Feb 28 09:20:25 2018
 def unitsDef(xlabel_name):
     units_dict = {'CK_SpectrumM4X_TestDetuning': 'MHz',
                   'CK_MWSweepTime': 'us',
+                  'CK_MWCleanPrep_Time': 'us',
                   'SP_A_uWaveDetuning': 'MHz',
                   'CK_TestuWaveSweepT': 'us',
                   'FI_Ixon_TweezerExpTime': 'us',
@@ -18,6 +19,7 @@ def unitsDef(xlabel_name):
                   'Lattice_Imag_ShakingFrequency': 'kHz',
                   'Lattice_Imag_ShakingDuration': 'ms',
                   'Lattice_OffOffset': 'us',
+                  'LocalLarmor_Duration': 'us',
                   'MOT_cMOT_FreqRampDur': 'ms',
                   'MS_CheckFieldWaitTime': 'us',
                   'MS_TweezerSweepDuration': 'ms',
@@ -32,8 +34,10 @@ def unitsDef(xlabel_name):
                   'MS_SweepDuration': 'ms',
                   'MS_TweezerSweepWaitTime': 'ms',
                   'MS_TweezerRamseyTime': 'us',
+                  'MS_ImagingRamseyWaitTime': 'us',
                   'MS_TweezerDetuning': 'MHz',
                   'MS_PhaseImprintPhase': 'deg',
+                  'MWPiTime_m10': 'us',
                   'MWR_SPSweepDuration': 'us',
                   'Raman_BigRamanDuration': 'us',
                   'RamanCooling_Duration': 'ms',
@@ -75,7 +79,8 @@ def unitsDef(xlabel_name):
                   'Tweezers_LatticeRampDownDur': 'ms',
                   "Tweezers_LoopDuration": "us",
                   'Tweezers_Lattice_HoldTime': "ms",
-                  'Tweezers_HoldDuration': 'ms'
+                  'Tweezers_HoldDuration': 'ms',
+                  'Tweezers_HoldBeforeKP': 'ms'
                   }
     units_multiplier = {'us': 1e6,
                         'ms': 1e3,

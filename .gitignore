@@ -3,3 +3,7 @@
 *.mp3
 credentials.json
 token.json
+*.iml
+*.xml
+*.iml
+*.xml

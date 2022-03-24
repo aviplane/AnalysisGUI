@@ -33,10 +33,18 @@ class AlertSystem():
                         'escooper@stanford.edu',
                         'kunkel@stanford.edu',
                         'avikar@stanford.edu']
+
         self.refresh_period = 45  # minutes
+
         self.sent_alert = False
         self.bad_shot_counter = 0
         self.bad_shot_threshold = 4
+
+        self.sent_probe_alert = False
+        self.bad_probe_counter = 0
+        self.bad_probe_threshold = 1
+        self.n_mails = 0
+        self.mail_limit = 5
 
     def check_refresh(self,):
         current_time = time.time()
@@ -45,6 +53,10 @@ class AlertSystem():
             self.refresh_time = current_time
         return
 
+    def good_probe_shot(self):
+        self.sent_probe_alert = False
+        self.bad_probe_counter = 0
+
     def good_shot(self):
         self.sent_alert = False
         self.bad_shot_counter = 0
@@ -52,13 +64,34 @@ class AlertSystem():
     def bad_shot(self):
         self.bad_shot_counter += 1
 
-    def mot_problem(self):
+    def mot_problem(self, scan):
         self.bad_shot_counter += 1
         if not self.sent_alert and self.bad_shot_counter > self.bad_shot_threshold:
-            [self.gmail.send_error_message(email, "MOT out")
+            [self.gmail.send_error_message(email, f"MOT out in scan {scan}")
              for email in self.to_send]
             self.sent_alert = True
         return
+
+    # TODO: change to decorator
+    def atom_problem(self, scan):
+        self.bad_shot_counter += 1
+        if not self.sent_alert and self.bad_shot_counter > self.bad_shot_threshold:
+            [self.gmail.send_error_message(email, f"No atoms in scan {scan}, but MOT is good")
+             for email in self.to_send]
+            self.sent_alert = True
+        return
+
+    def probe_problem(self, scan):
+        self.bad_probe_counter += 1
+        if not self.sent_probe_alert and self.bad_probe_counter > self.bad_probe_threshold and self.n_mails < self.mail_limit:
+            [self.gmail.send_error_message(email, f"The probe needs help since scan {scan}, but don't worry you don't have to get up, you can do it remotely")
+             for email in self.to_send]
+            self.sent_probe_alert = True
+            self.n_mails += 1
+
+    def crash_alert(self):
+        [self.gmail.send_error_message(email, "I tried my best, but I crashed again \n Your runmanager")
+         for email in self.to_send]
 
 
 class FileSorter(QThread):
@@ -91,15 +124,25 @@ class FileSorter(QThread):
             self.xlabel_dict = {}
 
     def run(self):
+        ref_time = time.time()
+        no_folder_limit = 300
+        sent_crash_alert = False
         while self.running:
             self.all_files, self.files_to_sort = self.get_unanalyzed_files()
             if len(self.files_to_sort) > 0:
                 self.sort_files(self.files_to_sort)
                 self.signal_output.folder_output_signal.emit(
                     self.folder_to_plot)
+                ref_time = time.time()
+                if sent_crash_alert:
+                    sent_crash_alert = False
             else:
+                no_folder_duration = time.time() - ref_time
+                if no_folder_duration > no_folder_limit and self.alert_system.do_alerts and not sent_crash_alert:
+                    self.alert_system.crash_alert()
+                    sent_crash_alert = True
                 print("No Folders made yet")
-            QThread.sleep(3)
+            QThread.sleep(6)
         print("Thread ended")
 
     def stop(self):
@@ -187,7 +230,8 @@ class FileSorter(QThread):
             return v
         return
 
-    def extract_counts(self, pic_, ref_pic, short_axis=40, long_axis=80, rotation=-5, counts_to_atoms=216):
+    def extract_counts(self, pic_, ref_pic, short_axis=40, long_axis=80,
+                       rotation=-5, counts_to_atoms=COUNT_TO_ATOM):
         # define region to adjust background subtraction
         x_1 = 600
         x_2 = 800
@@ -278,7 +322,6 @@ class FileSorter(QThread):
                 values.append(value)
             np.save(file_location, values)
         except IOError:
-            traceback.print_exc()
             to_save = np.array([value]) if numpy_array else [value]
             np.save(file_location, to_save)
 
@@ -309,20 +352,36 @@ class FileSorter(QThread):
             file, "ProbeLockMonitor")
         probe_lock_signal, _ = self.get_rigol_transmission(
             file, "ProbeLockSignal")
+        self.save_value(COUNT_TO_ATOM, current_folder,
+                        "count_to_atom_conversion.npy")
         self.save_value(probe_lock_monitor,
                         current_folder,
                         "probe_lock_monitor.npy")
         self.save_value(probe_lock_signal,
                         current_folder,
                         "probe_lock_signal.npy")
+        # get scan number out of file
+        scan = self.get_scan_time(file)
 
         good_MOT = self.check_MOT(file)
-
+        good_atoms = np.max(n_states) > 700
+        good_probe = np.max(bare_probe) > 0.4
+        print(np.max(n_states))
         if self.alert_system.do_alerts:
             if not good_MOT:
-                self.alert_system.mot_problem()
-            if good_MOT:
-                self.alert_system.good_shot()
+                self.alert_system.mot_problem(scan)
+            elif not good_atoms:
+                if not file_globals['CheckMagneticFieldCleaning']:
+                    self.alert_system.atom_problem(scan)
+            elif not good_probe:
+                self.alert_system.probe_problem(scan)
+
+        if good_probe:
+            self.alert_system.good_probe_shot()
+
+        if good_MOT and good_atoms:
+            self.alert_system.good_shot()
+
         if "PairCreation_" in current_folder and alarm:
             print("Probe Out")
             # playsound("beep.mp3")
@@ -520,6 +579,8 @@ class FileSorter(QThread):
                 main_string = b_field_check_string
             if scan_globals["CheckMagneticFieldImaging"]:
                 main_string = b_field_check_imaging_string
+            if scan_globals["CheckMagneticFieldCleaning"]:
+                main_string = b_field_check_cleaning_string
         except Exception as e:
             print("Filesorter line 353", e)
             traceback.print_exc()

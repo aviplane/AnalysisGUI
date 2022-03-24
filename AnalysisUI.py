@@ -1,6 +1,7 @@
 from PyQt5.QtWidgets import *
 from FormattingStrings import *
 from PyQt5.QtCore import *
+from PyQt5.QtGui import QIcon
 import matplotlib.pyplot as plt
 from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg as FigureCanvas
 from matplotlib.backends.backend_qt4agg import NavigationToolbar2QT as NavigationToolbar
@@ -20,6 +21,9 @@ class AnalysisUI:
         self.picker_date.setDate(QDate.currentDate())
         self.cb_script = QComboBox()
         self.cb_data = QComboBox()
+        self.button_refresh_data = QPushButton()
+        self.button_refresh_data.setText("Refresh")
+        self.button_refresh_data.setIcon(QIcon("refresh.png"))
 
         self.checkbox_imaging_calibration = QCheckBox("Imaging Calibration")
         self.checkbox_adjust_amplitudes = QCheckBox(
@@ -27,21 +31,7 @@ class AnalysisUI:
         self.checkbox_adjust_probe = QCheckBox("Shift Probe")
         self.checkbox_shot_alert = QCheckBox("Shot Alerts")
         self.checkbox_ignore_first_shot = QCheckBox("Ignore First Shot")
-        self.checkbox_delete_reps = QCheckBox("Delete Reps")
-
-        self.corr_min_label = QLabel("Sidemode Minimum Fraction: ")
-        self.corr_max_label = QLabel("Sidemode Maximum Fraction: ")
-
-        self.corr_min_value = QLabel("0")
-        self.corr_max_value = QLabel("1")
-
-        self.corr_threshold_min = QSlider(Qt.Horizontal)
-        self.corr_threshold_min.setRange(0, 100)
-        self.corr_threshold_min.setValue(0)
-
-        self.corr_threshold_max = QSlider(Qt.Horizontal)
-        self.corr_threshold_max.setRange(0, 100)
-        self.corr_threshold_max.setValue(100)
+        self.button_reset_mail = QPushButton("Reset Mail")
 
         self.checkbox_probe_threhold = QCheckBox("Probe Thresholding")
         self.probe_threshold_label = QLabel("Probe Threshold: ")
@@ -55,6 +45,7 @@ class AnalysisUI:
         self.parameters_label = QLabel(f"Parameters: ")
         self.parameters_lineedit = QLineEdit()
 
+        self.trap_selector_label = QLabel(f"Traps: ")
         self.index_label = QLabel(f"Index: ")
         self.index_lineedit = QLineEdit()
 
@@ -67,13 +58,18 @@ class AnalysisUI:
         self.go_button = QPushButton("Go")
 
         row_num = 0
-        self.grid_layout.addWidget(self.picker_date, row_num, 0, 1, 1)
-        self.grid_layout.addWidget(self.cb_script, row_num, 1, 1, 1)
-        self.grid_layout.addWidget(self.cb_data, row_num, 2, 1, 1)
-        self.grid_layout.addWidget(
-            self.label_folder_name,
-            row_num, 3, 1, n_columns - 3
+        self.date_picker_layout = QHBoxLayout()
+        self.date_picker_layout.addWidget(self.picker_date)
+        self.date_picker_layout.addWidget(self.cb_script)
+        self.date_picker_layout.addWidget(self.cb_data)
+        self.date_picker_layout.addWidget(
+            self.label_folder_name
         )
+        self.date_picker_layout.addWidget(
+            self.button_refresh_data
+        )
+
+        self.grid_layout.addLayout(self.date_picker_layout, row_num, 0, 1, 6)
 
         row_num = row_num + 1
         self.option_selector_layout = QHBoxLayout()
@@ -82,13 +78,13 @@ class AnalysisUI:
         self.option_selector_layout.addWidget(
             self.checkbox_adjust_amplitudes)
         self.option_selector_layout.addWidget(self.checkbox_ignore_first_shot)
-        self.option_selector_layout.addWidget(self.checkbox_delete_reps)
         self.option_selector_layout.addWidget(self.checkbox_probe_threhold)
         self.option_selector_layout.addWidget(self.probe_threshold_label)
         self.option_selector_layout.addWidget(self.probe_threshold)
         self.option_selector_layout.addWidget(self.probe_threshold_value_label)
         self.option_selector_layout.addWidget(self.checkbox_adjust_probe)
         self.option_selector_layout.addWidget(self.checkbox_shot_alert)
+        self.option_selector_layout.addWidget(self.button_reset_mail)
         self.grid_layout.addLayout(
             self.option_selector_layout, row_num, 0, 1, n_columns - 1)
 
@@ -97,8 +93,15 @@ class AnalysisUI:
         row_num += 1
         # Add in parameter field
         self.parameter_selector_layout = QHBoxLayout()
-        self.grid_layout.addWidget(self.parameters_label, row_num, 0, 1, 1)
-        self.grid_layout.addWidget(self.parameters_lineedit, row_num, 1, 1, 2)
+        self.parameter_selector_layout.addWidget(self.parameters_label)
+        self.parameter_selector_layout.addWidget(self.parameters_lineedit)
+        # Choose traps to analyze
+        self.parameter_selector_layout.addWidget(self.trap_selector_label)
+
+        self.grid_layout.addLayout(
+            self.parameter_selector_layout, row_num, 0, 1, self.n_columns)
+        # self.grid_layout.addWidget(self.parameters_label, row_num, 0, 1, 1)
+        # self.grid_layout.addWidget(self.parameters_lineedit, row_num, 1, 1, 2)
 
         row_num += 1
         self.f2_threshold_checkbox = QCheckBox("F = 2 Thresholding")
@@ -115,8 +118,6 @@ class AnalysisUI:
         self.grid_layout.addLayout(
             self.threshold_layout, row_num, 0, 1, self.n_columns)
         row_num = row_num + 1
-        self.grid_layout.addWidget(
-            self.go_button, row_num, 0, 1, self.n_columns)
 
         self.figure_1d, self.axis_1d = plt.subplots()
         self.canvas_1d = FigureCanvas(self.figure_1d)
@@ -142,7 +143,6 @@ class AnalysisUI:
         self.canvas_6 = FigureCanvas(self.figure_6)
         self.toolbar_6 = NavigationToolbar(self.canvas_6, self)
 
-        row_num = row_num + 1
         self.grid_layout.addWidget(
             self.toolbar_1d, row_num, 0, 1, self.n_columns / 2)
         self.grid_layout.addWidget(
@@ -154,17 +154,7 @@ class AnalysisUI:
             self.canvas_2d, row_num + 1, self.n_columns / 2, 1, self.n_columns / 2)
 
         row_num = row_num + 2
-        self.corr_threshold_layout = QHBoxLayout()
-        self.grid_layout.addLayout(
-            self.corr_threshold_layout, row_num, 0, 1, self.n_columns)
-        self.corr_threshold_layout.addWidget(self.corr_min_label)
-        self.corr_threshold_layout.addWidget(self.corr_min_value)
-        self.corr_threshold_layout.addWidget(self.corr_threshold_min)
-        self.corr_threshold_layout.addWidget(self.corr_max_label)
-        self.corr_threshold_layout.addWidget(self.corr_max_value)
-        self.corr_threshold_layout.addWidget(self.corr_threshold_max)
 
-        row_num = row_num + 1
         self.grid_layout.addWidget(
             self.toolbar_corr, row_num, 0, 1, self.n_columns / 2)
         self.grid_layout.addWidget(

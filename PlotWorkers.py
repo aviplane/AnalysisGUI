@@ -13,6 +13,8 @@ from scipy.stats import norm
 import time
 import queue
 import matplotlib.pyplot as plt
+import sys
+import os
 file_save_queue = queue.Queue()
 
 
@@ -24,22 +26,57 @@ class PlotSaveWorker(QThread):
         self.running = True
         return
 
+    def save_figure(self, fig, title, current_folder):
+        """
+        Save an figure at current_folder/extradirectory/title.png
+
+        Parameters
+        ----------
+        fig : matplotlib figure
+            The figure to save.  Hopefully all the axes are set up correctly.
+        title : String
+            file name.
+        current_folder : String
+            folder to save in
+        Returns
+        -------
+        None.
+
+        """
+        current_folder = current_folder.replace("/", "\\")
+        save_folder = f"{current_folder}"
+        folder_to_plot = current_folder.split("\\")[-2]
+        if not os.path.isdir(save_folder):
+            os.makedirs(save_folder)
+        fig.tight_layout(rect=[0, 0.03, 1, 0.95])
+        title_string = f"{folder_to_plot}"
+        fig.suptitle(title_string)
+        print(f"{save_folder}{folder_to_plot}_{title}.png")
+        save_location = u'\\\\?\\' + \
+            f"{save_folder}{folder_to_plot}_{title}.png"
+        fig.savefig(
+            save_location)
+
     def run(self):
         while self.running:
             while file_save_queue.qsize() > 0:
                 try:
                     fig, fname, folder = file_save_queue.get()
-                    af.save_figure(fig, fname, folder)
-                    QThread.sleep(0.1)
+                    self.save_figure(fig, fname, folder)
+                    time.sleep(0.1)
                 except Exception as e:
+                    self.stop()
+                    (type, value, traceback) = sys.exc_info()
+                    sys.excepthook(type, value, traceback)
                     print(e, "Line 35 in PlotWorkers")
                     traceback.print_exc()
-            QThread.sleep(3)
+            QThread.sleep(1)
 
     def stop(self):
+        file_save_queue.queue.clear()
         self.running = False
-        if self.folder_to_plot:
-            self.signal_output.folder_output_signal.emit(self.folder_to_plot)
+        # if self.folder_to_plot:
+        #     self.signal_output.folder_output_signal.emit(self.folder_to_plot)
         self.terminate()
 
 
@@ -109,6 +146,9 @@ class Plot2DWorker(PlotFitWorker):
             file_save_queue.put((self.fig, '2d_plot', self.current_folder))
         except:
             traceback.print_exc()
+            sys.stderr.write("Error in 2D plot")
+            (type, value, traceback) = sys.exc_info()
+            sys.excepthook(type, value, traceback)
 
 
 class Plot1DWorker(PlotFitWorker):
@@ -122,16 +162,10 @@ class Plot1DWorker(PlotFitWorker):
             axis = self.fig.add_subplot(111)
             for state, state_std, label in zip(self.fit_mean, self.fit_std, self.roi_labels):
                 if label not in self.rois_to_exclude:
-                    # transparent_edge_plot(axis,
-                    #                       self.keys_adjusted,
-                    #                       state[:, 8],
-                    #                       state_std[:, 8],
-                    #                       label=fancy_titles[label])
-
                     transparent_edge_plot(axis,
                                           self.keys_adjusted,
                                           np.mean(
-                                              state[:, [6, 10]], axis=1),
+                                              state[:, self.traps], axis=1),
                                           np.mean(state_std, axis=1),
                                           label=fancy_titles[label])
                     af.save_array(np.mean(state, axis=1),
@@ -143,9 +177,16 @@ class Plot1DWorker(PlotFitWorker):
             axis.legend()
             axis.set_ylabel("Atoms")
             axis.set_xlabel(f"{self.xlabel} ({self.units})")
+            # current_folder = self.current_folder.replace("/", "\\")
+            # folder_to_plot = current_folder.split("\\")[-2]
+            # self.fig.tight_layout(rect=[0, 0.03, 1, 0.95])
+            # title_string = f"{folder_to_plot}"
+            # self.fig.suptitle(title_string)
             file_save_queue.put((self.fig, '1d_plot', self.current_folder))
         except:
             traceback.print_exc()
+            (type, value, traceback) = sys.exc_info()
+            sys.excepthook(type, value, traceback)
 
 
 class Plot1DHistogramWorker(PlotFitWorker):
@@ -168,7 +209,7 @@ class Plot1DHistogramWorker(PlotFitWorker):
             axis.legend()
             axis.set_ylabel("Number of Shots")
             axis.set_xlabel(f"Atoms")
-            file_save_queue.put((self.fig, '1d_histplot', self.current_folder))
+            # file_save_queue.put((self.fig, '1d_histplot', self.current_folder))
         except:
             traceback.print_exc()
 
@@ -209,8 +250,8 @@ class PlotPCAWorker(PlotFitWorker):
             self.fig.colorbar(cax, ax=ax)
             ax.set_xlabel("Trap Index")
             ax_num += 1
-        file_save_queue.put(
-            (self.fig, 'pc_pca_components', self.current_folder))
+        # file_save_queue.put(
+        #     (self.fig, 'pc_pca_components', self.current_folder))
 
 
 class PlotXYWorker(PlotFitWorker):
@@ -246,7 +287,7 @@ class PlotXYWorker(PlotFitWorker):
         return var * scaling
 
     def run(self):
-        self.fit_mean = self.fit_mean[..., [6, 10]]  # HARD CODED, this is bad
+        self.fit_mean = self.fit_mean[..., [8, 12]]  # HARD CODED, this is bad
         self.fit_mean = np.array([i for i in self.fit_mean if np.sum(i) > 600])
         if self.fit_mean.shape[0] < 8:
             return
@@ -309,7 +350,7 @@ class PlotXYWorker(PlotFitWorker):
         ax.set_xlabel("Spinor Phase ($\pi$)")
         ax.set_ylim(0.5, None)
         ax.set_ylabel("Variance")
-        file_save_queue.put((self.fig, 'pc_xy_plot', self.current_folder))
+        # file_save_queue.put((self.fig, 'pc_xy_plot', self.current_folder))
 
 
 class PlotCorrelationWorker(PlotFitWorker):
@@ -404,6 +445,6 @@ class PlotCorrelationWorker(PlotFitWorker):
                       self.current_folder)
         axes[2].set_title("Total atom number normalization")
         axes[3].set_title("Sidemode normalization")
-        file_save_queue.put((self.fig, 'correlations', self.current_folder))
+        # file_save_queue.put((self.fig, 'correlations', self.current_folder))
 
 #        af.save_figure(self.fig, "correlations", self.current_folder)
