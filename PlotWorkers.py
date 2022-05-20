@@ -15,6 +15,8 @@ import queue
 import matplotlib.pyplot as plt
 import sys
 import os
+from datetime import date
+
 file_save_queue = queue.Queue()
 
 
@@ -49,11 +51,11 @@ class PlotSaveWorker(QThread):
         if not os.path.isdir(save_folder):
             os.makedirs(save_folder)
         fig.tight_layout(rect=[0, 0.03, 1, 0.95])
-        title_string = f"{folder_to_plot}"
+        title_string = f"{folder_to_plot} | {str(date.today())}"
         fig.suptitle(title_string)
         print(f"{save_folder}{folder_to_plot}_{title}.png")
         save_location = u'\\\\?\\' + \
-            f"{save_folder}{folder_to_plot}_{title}.png"
+            f"{save_folder}{folder_to_plot}_{title}_{str(date.today())}.png"
         fig.savefig(
             save_location)
 

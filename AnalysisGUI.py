@@ -420,7 +420,7 @@ class AnalysisGUI(QMainWindow, AnalysisUI):
 
                 self.threadpool.start(plotPCAworker)
                 # self.threadpool.start(plotCorrelationWorker)
-            elif "IntDuration" in self.folder_to_plot or "OG_Duration" in self.folder_to_plot or "SpinExchange" in self.folder_to_plot or 'PhaseImprintPhase' in self.folder_to_plot:
+            elif "Duration" in self.folder_to_plot or "OG_Duration" in self.folder_to_plot or "SpinExchange" in self.folder_to_plot or 'PhaseImprintPhase' in self.folder_to_plot:
                 self.canvas_corr.setFixedHeight(600)
                 try:
                     self.make_phase_plot(sf, units)
@@ -918,11 +918,9 @@ class AnalysisGUI(QMainWindow, AnalysisUI):
         globals_list = np.load(current_folder + "/globals.npy",
                                allow_pickle=True)
         fits = np.load(current_folder + "/all_rois.npy")
-        print(np.max(fits))
         fits = np.apply_along_axis(
             AnalysisFunctions.get_trap_counts_from_roi, 2, fits)
         fits = AnalysisFunctions.get_atom_number_from_fluorescence(fits)
-        print(np.max(fits))
         if len(fits) < 2:
             return
         roi_labels = list(np.load(current_folder + "/roi_labels.npy"))
@@ -951,8 +949,8 @@ class AnalysisGUI(QMainWindow, AnalysisUI):
             c_num = np.array([c_num])
         phase = np.angle(c_num)
         contrast = np.abs(c_num)
-        contrast[:, np.delete(np.arange(n_traps), [6, 10])] = 0
-        phase[:, np.delete(np.arange(n_traps), [6, 10])] = 0
+        contrast[:, np.delete(np.arange(n_traps), self.traps)] = 0
+        phase[:, np.delete(np.arange(n_traps), self.traps)] = 0
         print("Contrast", contrast.dtype)
         print("phase", phase)
         self.save_array(phase, "phase", current_folder)
@@ -991,7 +989,7 @@ class AnalysisGUI(QMainWindow, AnalysisUI):
         cax = ax_y.imshow(y_pol, cmap=magnetization_colormap, aspect="auto", extent=extent,
                           vmin=-1, vmax=1)
         self.figure_phase.colorbar(cax, ax=ax_y)
-        # af.save_figure(self.figure_phase, "phase_plot", current_folder)
+        af.save_figure(self.figure_phase, "phase_plot", current_folder)
 
         self.canvas_phase.draw()
 

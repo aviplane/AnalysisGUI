@@ -534,12 +534,16 @@ class FileSorter(QThread):
         elif len(labels) > 1:
             if 'PR_WaitTime' in labels:
                 return 'PR_WaitTime'
+            if 'LocalSpinor_Duration' in labels:
+                return 'LocalSpinor_Duration'
             if 'Tweezers_AOD0_LoadAmp' in labels:
                 return 'Tweezers_AOD0_LoadAmp'
             if 'Tweezer_RamseyPhase' in labels:
                 return labels[(labels.index('Tweezer_RamseyPhase') + 1) % l]
             if 'SR_GlobalLarmor' in labels:
                 return labels[(labels.index('SR_GlobalLarmor') + 1) % l]
+            if 'Raman_RamseyPhaseOffset' in labels:
+                return labels[(labels.index('Raman_RamseyPhaseOffset') + 1) % l]
             if 'Raman_RamseyPhase' in labels:
                 return labels[(labels.index('Raman_RamseyPhase') + 1) % l]
             if 'SP_RamseyPulsePhase' in labels:
@@ -569,6 +573,10 @@ class FileSorter(QThread):
             main_string = self.process_xlabel(xlabel)
         if scan_globals["MeasurePairCreation"]:
             main_string = 'PairCreation_' + main_string
+        if scan_globals["Physics_DoSequence"]:
+            add_string = scan_globals['Descriptor']
+            main_string = 'PairCreationSequence_' + add_string
+            print(main_string)
         if scan_globals["MeasureSpinExchange"]:
             main_string = "SpinExchange_" + main_string
         if scan_globals["CheckCavityShift"]:

@@ -7,3 +7,5 @@ token.json
 *.xml
 *.iml
 *.xml
+.idea/modules.xml
+.idea/AnalysisGUI.iml
