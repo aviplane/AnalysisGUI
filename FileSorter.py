@@ -129,8 +129,9 @@ class FileSorter(QThread):
         sent_crash_alert = False
         while self.running:
             self.all_files, self.files_to_sort = self.get_unanalyzed_files()
+            self.files_to_sort = sorted(self.files_to_sort)
             if len(self.files_to_sort) > 0:
-                self.sort_files(self.files_to_sort)
+                self.sort_files(self.files_to_sort[:-1])
                 self.signal_output.folder_output_signal.emit(
                     self.folder_to_plot)
                 ref_time = time.time()
@@ -220,12 +221,12 @@ class FileSorter(QThread):
     def format_parameter(self, v, factor):
         try:
             v = v * factor
-            if hasattr(value, '__iter__'):
-                value = np.round(value, 4)
+            if hasattr(v, '__iter__'):
+                value = np.round(v, 4)
                 return '-'.join(map(str, value))
             else:
                 # not iterable
-                return f"{np.round(value, 4)}"
+                return f"{np.round(v, 4)}"
         except:  # probably a string, and we're lazy bc friyay
             return v
         return
@@ -239,10 +240,10 @@ class FileSorter(QThread):
         y_2 = 80
         # compensation = np.sum(np.sum(pic_[y_1:y_2, x_1:x_2]))\
         #     / np.sum(np.sum(ref_pic[y_1:y_2, x_1:x_2]))
-        compensation = 1
+        compensation = 1 #???
 
         # Calculate subtracted ref_pic
-        pic = pic_ - compensation * ref_pic
+        pic = pic_ - compensation * ref_pic ###This seems wrong?
 
         # Extract counts for each trap
         trap_counts = np.zeros(len(af.trap_centers))
@@ -365,7 +366,7 @@ class FileSorter(QThread):
 
         good_MOT = self.check_MOT(file)
         good_atoms = np.max(n_states) > 700
-        good_probe = np.max(bare_probe) > 0.4
+        good_probe = np.max(bare_probe) > 0.3
         print(np.max(n_states))
         if self.alert_system.do_alerts:
             if not good_MOT:
@@ -590,7 +591,6 @@ class FileSorter(QThread):
             if scan_globals["CheckMagneticFieldCleaning"]:
                 main_string = b_field_check_cleaning_string
         except Exception as e:
-            print("Filesorter line 353", e)
             traceback.print_exc()
         main_string = f"{main_string}"
 

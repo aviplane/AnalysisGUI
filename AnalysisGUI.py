@@ -404,15 +404,13 @@ class AnalysisGUI(QMainWindow, AnalysisUI):
             )
             if "PairCreation" in self.folder_to_plot and 'time' not in self.folder_to_plot or 'iteration' in self.folder_to_plot:
                 self.canvas_corr.setFixedHeight(600)
-                threshold_low = self.corr_threshold_min.value() / 100
-                threshold_high = self.corr_threshold_max.value() / 100
                 plotPCAworker = PlotPCAWorker(
                     current_folder, self.figure_phase, xlabel, units, fits, fit_std, roi_labels, keys_adjusted, rois_to_exclude=self.rois_to_exclude
                 )
                 plotCorrelationWorker = PlotCorrelationWorker(
                     current_folder, self.figure_corr, xlabel, units, fits, fit_std, roi_labels, keys_adjusted, rois_to_exclude=self.rois_to_exclude
                 )
-                plotCorrelationWorker.set_limits(threshold_low, threshold_high)
+                plotCorrelationWorker.set_limits(0, 1)
                 plotCorrelationWorker.set_normalize(
                     self.checkbox_normalize_correlations.isChecked())
                 plotXYWorker.xlabels = np.load(current_folder + "/xlabels.npy")

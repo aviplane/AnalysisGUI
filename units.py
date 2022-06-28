@@ -38,6 +38,8 @@ def unitsDef(xlabel_name):
                   'MS_ImagingRamseyWaitTime': 'us',
                   'MS_TweezerDetuning': 'MHz',
                   'MS_PhaseImprintPhase': 'deg',
+                  'MS_PhaseImprintShift': 'kHz',
+                  'MS_PhaseImprintDurationOverride': 'us',
                   'MWPiTime_m10': 'us',
                   'MWR_SPSweepDuration': 'us',
                   'Raman_BigRamanDuration': 'us',
