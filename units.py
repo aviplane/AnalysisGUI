@@ -41,6 +41,7 @@ def unitsDef(xlabel_name):
                   'MS_PhaseImprintShift': 'kHz',
                   'MS_PhaseImprintDurationOverride': 'us',
                   'MWPiTime_m10': 'us',
+                  'MWPiTime_m1m2': 'us',
                   'MWR_SPSweepDuration': 'us',
                   'Raman_BigRamanDuration': 'us',
                   'RamanCooling_Duration': 'ms',
@@ -73,8 +74,10 @@ def unitsDef(xlabel_name):
                   "SP_A_RamanRampOffDur": 'ms',
                   'SP_RamseyWaitTime': 'us',
                   'SP_A_RamseyPulseTime': 'us',
+                  'StatePrep_MWPiTime_m3': 'us',
                   'Lattice_rampUpEarly': 'ms',
                   "Lattice_TrapRampDownDur": "ms",
+                  "Lattice_PhysicsFreq":"kilohertz",
                   'Tweezers_Imaging_RampUpDur': 'ms',
                   'Tweezers_ImageSweepDuration': 'ms',
                   'Tweezers_Imaging_HoldTime': 'ms',
@@ -89,7 +92,8 @@ def unitsDef(xlabel_name):
     units_multiplier = {'us': 1e6,
                         'ms': 1e3,
                         'MHz': 1,
-                        'kHz': 1e-3,
+                        'kHz': 1e3,
+                        'kilohertz':1e-3,
                         'V': 1,
                         'deg': 1}
     if xlabel_name == 'ProbeCenterSweep':
