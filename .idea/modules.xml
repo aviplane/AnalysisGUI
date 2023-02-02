@@ -3,6 +3,11 @@
   <component name="ProjectModuleManager">
     <modules>
       <module fileurl="file://$PROJECT_DIR$/.idea/AnalysisGUI.iml" filepath="$PROJECT_DIR$/.idea/AnalysisGUI.iml" />
+      <module fileurl="file://S:/Schleier Lab Dropbox/Cavity Lab Data/Cavity Lab Scripts/cavity_analysis/Automatic Analysis/.idea/Automatic Analysis.iml" filepath="S:/Schleier Lab Dropbox/Cavity Lab Data/Cavity Lab Scripts/cavity_analysis/Automatic Analysis/.idea/Automatic Analysis.iml" />
+      <module fileurl="file://S:/Schleier Lab Dropbox/Cavity Lab Data/Cavity Lab Scripts/cavity_labscriptlib/RbCavity/.idea/RbCavity.iml" filepath="S:/Schleier Lab Dropbox/Cavity Lab Data/Cavity Lab Scripts/cavity_labscriptlib/RbCavity/.idea/RbCavity.iml" />
+      <module fileurl="file://S:/Schleier Lab Dropbox/Cavity Lab Data/Cavity Lab Scripts/cavity_analysis/View_Ixon_GUI/.idea/View_Ixon_GUI.iml" filepath="S:/Schleier Lab Dropbox/Cavity Lab Data/Cavity Lab Scripts/cavity_analysis/View_Ixon_GUI/.idea/View_Ixon_GUI.iml" />
+      <module fileurl="file://S:/Schleier Lab Dropbox/Cavity Lab Data/Cavity Lab Scripts/cavity_analysis/.idea/analysis_scripts.iml" filepath="S:/Schleier Lab Dropbox/Cavity Lab Data/Cavity Lab Scripts/cavity_analysis/.idea/analysis_scripts.iml" />
+      <module fileurl="file://$APPLICATION_CONFIG_DIR$/projects/workspace/.idea/workspace.iml" filepath="$APPLICATION_CONFIG_DIR$/projects/workspace/.idea/workspace.iml" />
     </modules>
   </component>
 </project>

@@ -4,5 +4,10 @@
     <content url="file://$MODULE_DIR$" />
     <orderEntry type="inheritedJdk" />
     <orderEntry type="sourceFolder" forTests="false" />
+    <orderEntry type="module" module-name="workspace" />
+    <orderEntry type="module" module-name="Automatic Analysis" />
+    <orderEntry type="module" module-name="View_Ixon_GUI" />
+    <orderEntry type="module" module-name="RbCavity" />
+    <orderEntry type="module" module-name="analysis_scripts" />
   </component>
 </module>

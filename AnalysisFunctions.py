@@ -26,10 +26,10 @@ background_components = np.load(
 roi_location_path = f"{data_location}Cavity Lab Scripts\\cavity_analysis\\roi_selector.npy"
 trap_location_path = f"{data_location}Cavity Lab Scripts\\cavity_analysis\\trap_selector.npy"
 
-_, _, _, _, _, x_start, _, _, _, _ = np.load(roi_location_path)
-n_traps, trap_width, trap_start, trap_distance = np.load(trap_location_path)
+# _, _, _, _, _, x_start, _, _, _, _ = np.load(roi_location_path)
+# n_traps, trap_width, trap_start, trap_distance = np.load(trap_location_path)
 
-trap_centers = np.arange(n_traps) * trap_distance + trap_start + x_start
+# trap_centers = np.arange(n_traps) * trap_distance + trap_start + x_start
 
 
 def get_complete_folder_path(apd, datafolder, data_date=str(date.today())):

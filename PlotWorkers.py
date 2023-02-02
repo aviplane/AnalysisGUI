@@ -2,7 +2,7 @@ from PyQt5.QtGui import *
 from PyQt5.QtWidgets import *
 from PyQt5.QtCore import *
 from FormattingStrings import *
-from plotformatting import *
+from PlottingTools import *
 import numpy as np
 import AnalysisFunctions as af
 import traceback
@@ -18,6 +18,7 @@ import os
 from datetime import date
 
 file_save_queue = queue.Queue()
+atom_cmap = cm.blues
 
 
 class PlotSaveWorker(QThread):

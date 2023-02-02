@@ -24,10 +24,8 @@ from PyQt5.QtCore import *
 import AnalysisFunctions as af
 from colorcet import cm
 import matplotlib.pyplot as plt
-#from matplotlib.backends.backend_qtagg import FigureCanvasQTAgg as FigureCanvas
-#from matplotlib.backends.backend_qtagg import NavigationToolbar2QT as NavigationToolbar
 from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg as FigureCanvas
-from matplotlib.backends.backend_qt4agg import NavigationToolbar2QT as NavigationToolbar
+from matplotlib.backends.backend_qt5agg import NavigationToolbar2QT as NavigationToolbar
 from AnalysisUI import AnalysisUI
 from FileSorter import FileSorter
 from plotformatting import *
@@ -368,8 +366,7 @@ class AnalysisGUI(QMainWindow, AnalysisUI):
         roi_labels = np.load(current_folder + "/state_labels.npy")
         all_globals = np.load(
             current_folder + "/globals.npy", allow_pickle=True)[0]
-        traps = [i for i in np.arange(
-            18) if i not in all_globals['Tweezers_AOD1_DeleteTraps']]
+        traps = all_globals['Tweezers_AOD1_Traps']
         print("Expected Traps: ", traps)
 #        fits, xlabels = self.select_f2_threshold(fits, xlabels, roi_labels)
         if len(fits) < 1:
@@ -418,7 +415,7 @@ class AnalysisGUI(QMainWindow, AnalysisUI):
 
                 self.threadpool.start(plotPCAworker)
                 # self.threadpool.start(plotCorrelationWorker)
-            elif "Duration" in self.folder_to_plot or "OG_Duration" in self.folder_to_plot or "SpinExchange" in self.folder_to_plot or 'PhaseImprintPhase' in self.folder_to_plot:
+            elif "Duration" in self.folder_to_plot or "OG_Duration" in self.folder_to_plot or "SpinExchange" in self.folder_to_plot or 'PhaseImprintPhase' in self.folder_to_plot or "PhaseTime" in self.folder_to_plot or "RamseyPhase" in self.folder_to_plot or "RamseyReadout" in self.folder_to_plot:
                 self.canvas_corr.setFixedHeight(600)
                 try:
                     self.make_phase_plot(sf, units)
@@ -782,7 +779,6 @@ class AnalysisGUI(QMainWindow, AnalysisUI):
             current_folder + "/bare_probe.npy", allow_pickle=True)
         physics_probes = np.load(
             current_folder + "/fzx_probe.npy", allow_pickle=True)
-
         bare_probes = np.array(bare_probes)
         self.figure_probe.clf()
 
@@ -811,6 +807,7 @@ class AnalysisGUI(QMainWindow, AnalysisUI):
         physics_means = np.array(
             [self.__mean_probe_value__(i) for i in physics_probes]
         )
+        print(physics_means)
         ax = self.figure_probe.add_subplot(1, 2, 2)
         transparent_edge_plot(
             ax, keys_adjusted[sorting_order], physics_means[sorting_order])
@@ -848,26 +845,28 @@ class AnalysisGUI(QMainWindow, AnalysisUI):
                 traceback.print_exc()
         #af.save_figure(self.figure_probe, "probe", current_folder)
         print("Putting Probe figure in queue")
-        # PlotWorkers.file_save_queue.put(
-        #     (self.figure_probe, "probe", current_folder))
+        PlotWorkers.file_save_queue.put(
+            (self.figure_probe, "probe", current_folder))
         self.canvas_probe.draw()
 
     def __mean_probe_value__(self, probe):
+        print(len(probe))
         if len(probe) > 65:
             bg = probe[:65]
             trans = probe[65:-35]
+            print(len(trans))
             return np.mean(trans) - np.mean(bg)
         return 0
 
     def __get_magnetization__(self, mean, roi_labels):
         print(np.max(mean))
-        mag = (
-            (mean[:, roi_labels.index("roi11"), :]
-             - mean[:, roi_labels.index("roi1-1"), :])
-            / (mean[:, roi_labels.index("roi11"), :]
-               + mean[:, roi_labels.index("roi1-1"), :]
-               + mean[:, roi_labels.index("roi10"), :]
-               )
+        mag = np.zeros((len(mean), mean.shape[2]))
+        plus = mean[:, roi_labels.index("roi11"), self.traps] 
+        minus = mean[:, roi_labels.index("roi1-1"), self.traps]
+        zero = mean[:, roi_labels.index("roi10"), self.traps] 
+        mag[:, self.traps] = (
+            (plus - minus)
+            / (plus + minus + zero)
         )
         return mag
 
@@ -886,7 +885,7 @@ class AnalysisGUI(QMainWindow, AnalysisUI):
             fits, xlabels, physics_probes)
         if len(xlabels) < 2:
             return
-        roi_labels = list(np.load(current_folder + "/roi_labels.npy"))
+        roi_labels = list(np.load(current_folder + "/state_labels.npy"))
         fit_mean, fit_std, xlabels = self.group_shot(fits, xlabels)
         keys_adjusted = np.array(xlabels) * sf
         self.figure_corr.clf()
@@ -897,8 +896,9 @@ class AnalysisGUI(QMainWindow, AnalysisUI):
         extent = [-0.5, fit_mean.shape[2] - 0.5,
                   np.max(keys_adjusted) + np.diff(keys_adjusted)[0],
                   np.min(keys_adjusted)]
+        mag = min(np.max(np.abs(pol)), 10)
         cax = ax.imshow(
-            pol, aspect="auto", cmap=magnetization_colormap, extent=extent, vmin=-1, vmax=1)
+            pol, aspect="auto", cmap=magnetization_colormap, extent=extent, vmin=-mag, vmax=mag)
         self.figure_corr.colorbar(cax, ax=ax)
         ax.set_ylabel(f"{xlabel} ({units})")
         ax.set_xlabel(f"Trap Index")
@@ -915,13 +915,13 @@ class AnalysisGUI(QMainWindow, AnalysisUI):
         #     return
         globals_list = np.load(current_folder + "/globals.npy",
                                allow_pickle=True)
-        fits = np.load(current_folder + "/all_rois.npy")
+        fits = np.load(current_folder + "/all_anums.npy")
         fits = np.apply_along_axis(
             AnalysisFunctions.get_trap_counts_from_roi, 2, fits)
         fits = AnalysisFunctions.get_atom_number_from_fluorescence(fits)
         if len(fits) < 2:
             return
-        roi_labels = list(np.load(current_folder + "/roi_labels.npy"))
+        roi_labels = list(np.load(current_folder + "/state_labels.npy"))
         phase_dict = self.group_shot_globals(fits,
                                              globals_list,
                                              "Raman_RamseyPhase")

@@ -16,6 +16,7 @@ def unitsDef(xlabel_name):
                   'FI_ImagCool_AM_Voltage': 'V',
                   'KP_F2_KillTime': 'us',
                   'KP_MWDurations': 'us',
+                  'KP_PulseWidth': 'us',
                   'Lattice_Imag_ShakingFrequency': 'kHz',
                   'Lattice_Imag_ShakingDuration': 'ms',
                   'Lattice_OffOffset': 'us',
